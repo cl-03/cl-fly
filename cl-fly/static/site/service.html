@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>星云工业 | 服务</title>
+  <style>
+    :root { --ink:#12203a; --brand:#0e6ad8; --bg:#f7f9fd; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"Segoe UI","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--ink); }
+    .wrap { max-width:960px; margin:0 auto; padding:24px 16px 80px; }
+    .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .top a { text-decoration:none; color:var(--ink); }
+    .hero { background:#fff; border-radius:16px; padding:26px; box-shadow:0 10px 28px rgba(8,24,58,.1); }
+    .svc { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+    .item { background:#fff; border-radius:12px; padding:14px; box-shadow:0 6px 20px rgba(0,0,0,.08); }
+    .kefu-float {
+      position:fixed; right:18px; bottom:18px; z-index:9999;
+      width:62px; height:62px; border-radius:50%; background:var(--brand); color:#fff;
+      display:flex; align-items:center; justify-content:center; text-decoration:none;
+      box-shadow:0 12px 26px rgba(0,72,172,.42); font-size:26px;
+      animation:pulse 1.9s infinite;
+    }
+    .tip {
+      position:fixed; right:92px; bottom:30px; background:#fff; color:#223;
+      border-radius:10px; padding:8px 10px; box-shadow:0 10px 30px rgba(0,0,0,.2);
+      font-size:13px;
+    }
+    @keyframes pulse {
+      0% { transform:scale(1); box-shadow:0 0 0 0 rgba(14,106,216,.45); }
+      70% { transform:scale(1.04); box-shadow:0 0 0 18px rgba(14,106,216,0); }
+      100% { transform:scale(1); box-shadow:0 0 0 0 rgba(14,106,216,0); }
+    }
+    @media (max-width:760px){ .svc{grid-template-columns:1fr;} .tip{display:none;} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <strong>服务中心</strong>
+      <div>
+        <a href="/">返回首页</a>
+        <a href="/agent-demo" style="margin-left:14px;">客服接待演示页</a>
+      </div>
+    </div>
+    <section class="hero">
+      <h1 style="margin:0 0 8px;">售前/售后服务</h1>
+      <p style="margin:0; line-height:1.7; color:#5f6f8b;">你现在看到的右下角动态图标已接入在线客服系统。点击可进入访客咨询页；另开一个标签页进入“客服接待演示页”可模拟接待和回复。</p>
+    </section>
+    <section class="svc">
+      <div class="item"><strong>售前咨询</strong><p>选型建议、预算评估、部署规划。</p></div>
+      <div class="item"><strong>实施服务</strong><p>安装调试、现场培训、验收支持。</p></div>
+      <div class="item"><strong>售后支持</strong><p>在线故障诊断、远程协助、服务工单。</p></div>
+      <div class="item"><strong>客户成功</strong><p>月度复盘、优化建议、能力共建。</p></div>
+    </section>
+  </div>
+
+  <div class="tip">在线客服 · 点击咨询</div>
+  <a class="kefu-float" href="/chat" target="_blank" title="在线客服">💬</a>
+</body>
+</html>

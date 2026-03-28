@@ -1,0 +1,5 @@
+# Runtime upload artifacts
+uploads/
+
+# Perf gate generated reports
+tests/perf/reports/*.txt

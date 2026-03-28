@@ -1,0 +1,72 @@
+(in-package #:cl-fly.core.session-attributes)
+
+(defparameter *session-attributes* (make-hash-table :test 'equal))
+(defparameter *session-attributes-lock* (bt:make-lock "session-attributes-lock"))
+(defparameter *allowed-attribute-keys* '("issuetype" "urgency" "language" "customertier"))
+
+(defun %blank-string-p (value)
+  (and (stringp value)
+       (string= (string-trim '(#\Space #\Tab #\Newline #\Return) value) "")))
+
+(defun %normalize-attribute-key (key)
+  (let ((k (string-downcase (princ-to-string key))))
+    (cond
+      ((string= k "issuetype") :issueType)
+      ((string= k "urgency") :urgency)
+      ((string= k "language") :language)
+      ((string= k "customertier") :customerTier)
+      (t nil))))
+
+(defun %normalize-attributes (attributes)
+  (let ((result '()))
+    (when (listp attributes)
+      (loop for (k v) on attributes by #'cddr
+            for normalized = (%normalize-attribute-key k)
+            when (and normalized
+                      (stringp v)
+                      (not (%blank-string-p v))
+                      (<= (length v) 128))
+              do (setf (getf result normalized) v)))
+    result))
+
+(defun get-session-attributes (session-id)
+  (cl-fly.core.session:ensure-session session-id)
+  (bt:with-lock-held (*session-attributes-lock*)
+    (copy-list (or (gethash session-id *session-attributes*) '()))))
+
+(defun set-session-attributes (session-id attributes)
+  (cl-fly.core.session:ensure-session session-id)
+  (let ((normalized (%normalize-attributes attributes)))
+    (bt:with-lock-held (*session-attributes-lock*)
+      (let ((current (copy-list (or (gethash session-id *session-attributes*) '()))))
+        (loop for (k v) on normalized by #'cddr
+              do (setf (getf current k) v))
+        (setf (gethash session-id *session-attributes*) current)
+        (copy-list current)))))
+
+(defun list-session-attributes ()
+  (bt:with-lock-held (*session-attributes-lock*)
+    (let ((items '()))
+      (maphash (lambda (sid attrs)
+                 (push (list :sessionId sid :attributes (copy-list attrs)) items))
+               *session-attributes*)
+      (sort items #'string< :key (lambda (x) (or (getf x :sessionId) ""))))))
+
+(defun find-session-attributes (&key issue-type urgency language customer-tier)
+  (let ((items (list-session-attributes)))
+    (remove-if-not
+     (lambda (item)
+       (let ((attrs (getf item :attributes)))
+     (and (or (null issue-type)
+          (%blank-string-p issue-type)
+                  (string= (or (getf attrs :issueType) "") issue-type))
+        (or (null urgency)
+          (%blank-string-p urgency)
+                  (string= (or (getf attrs :urgency) "") urgency))
+        (or (null language)
+          (%blank-string-p language)
+                  (string= (or (getf attrs :language) "") language))
+        (or (null customer-tier)
+          (%blank-string-p customer-tier)
+                  (string= (or (getf attrs :customerTier) "") customer-tier)))))
+     items)))

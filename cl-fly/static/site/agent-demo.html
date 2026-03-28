@@ -1,0 +1,1853 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>在线客服 - 接待端演示</title>
+  <style>
+    body{margin:0;font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#f3f6fc;}
+    .app{height:100vh;display:flex;flex-direction:column;padding:10px;max-width:1200px;margin:0 auto;}
+    .top{background:#112a4e;color:#fff;border-radius:12px 12px 0 0;padding:10px 14px;}
+    .line{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+    .line input{padding:7px 9px;border-radius:7px;border:1px solid #35527f;background:#fff;min-width:190px;}
+    .line button{padding:7px 10px;border:0;border-radius:7px;background:#2f7ae5;color:#fff;cursor:pointer;}
+    .meta{font-size:12px;opacity:.95;margin-top:6px;word-break:break-all;}
+    .state{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;}
+    .chip{font-size:12px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.2);}
+    .ok{background:rgba(80,200,120,.28);} .bad{background:rgba(255,90,90,.28);} .warn{background:rgba(255,195,0,.3);}
+    .main{display:grid;grid-template-columns:320px 1fr 290px;flex:1;min-height:0;border:1px solid #d8e1ef;border-top:none;border-radius:0 0 12px 12px;overflow:hidden;background:#fff;}
+    .sidebar{border-right:1px solid #e2e8f4;display:flex;flex-direction:column;min-height:0;}
+    .side-title{padding:10px 12px;font-size:13px;color:#4e5f7d;border-bottom:1px solid #e9eef7;background:#f7f9fe;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+    .toggles{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;}
+    .filters{padding:8px 12px;border-bottom:1px solid #e9eef7;background:#f9fbff;display:flex;gap:8px;flex-wrap:wrap;}
+    .filters select{padding:6px 8px;border:1px solid #cfd9ea;border-radius:6px;background:#fff;color:#34455f;font-size:12px;}
+    .filters button{padding:6px 10px;border:0;border-radius:6px;background:#2f7ae5;color:#fff;cursor:pointer;font-size:12px;}
+    .filters button.secondary{background:#5f6f8b;}
+    .toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:#5b6d8d;white-space:nowrap;}
+    .toggle input{margin:0;accent-color:#2f7ae5;}
+    .session-groups{flex:1;overflow:auto;}
+    .group{border-bottom:1px solid #eef2fb;}
+    .group:last-child{border-bottom:none;}
+    .group-title{padding:8px 12px;font-size:12px;color:#5a6c8d;background:#fbfcff;}
+    .group-title.unread{color:#b25a00;background:#fff7ea;}
+    .group-title.failed{color:#9d1f1f;background:#ffecec;}
+    .session-list{overflow:auto;}
+    .empty{padding:10px 12px;font-size:12px;color:#7b8aa6;}
+    .session-item{padding:10px 12px;border-bottom:1px solid #eef2fb;cursor:pointer;}
+    .session-item:hover{background:#f6f9ff;}
+    .session-item.active{background:#eaf2ff;}
+    .session-item.unread{background:#fff7e8;}
+    .sid{font-weight:600;font-size:13px;color:#1f2d3d;display:flex;justify-content:space-between;gap:8px;}
+    .sid-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .sid-right{display:flex;align-items:center;gap:6px;}
+    .last{margin-top:6px;font-size:12px;color:#5f6f8b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .last.typing-preview{color:#0f64cb;font-weight:600;}
+    .trend{margin-top:6px;display:flex;align-items:flex-end;gap:2px;height:16px;}
+    .trend i{display:inline-block;width:4px;background:#9db5dc;border-radius:2px;}
+    .trend i.hot{background:#d64545;}
+    .badge{font-size:11px;background:#ff6b35;color:#fff;border-radius:999px;padding:1px 7px;min-width:18px;text-align:center;}
+    .badge.fail{background:#d64545;}
+    .pin-btn{font-size:12px;line-height:1;border:1px solid #d5deef;background:#fff;border-radius:6px;padding:2px 6px;cursor:pointer;color:#6a7d9d;}
+    .pin-btn.on{border-color:#2f7ae5;color:#2f7ae5;background:#edf4ff;}
+    .chat{display:flex;flex-direction:column;min-height:0;}
+    .chat-head{padding:10px 12px;border-bottom:1px solid #edf2fb;background:#fafcff;font-size:13px;color:#40516f;}
+    .msgs{flex:1;overflow:auto;padding:10px;background:#fff;}
+    .chat-load-more{text-align:center;margin-bottom:8px;}
+    .chat-load-more a{font-size:12px;color:#2f7ae5;text-decoration:none;cursor:pointer;}
+    .m{margin:8px 0;display:flex;} .a{justify-content:flex-end;} .a .b{background:#d8e9ff;} .v .b{background:#f0f4fa;}
+    .m.note{justify-content:center;}
+    .m.note .b{background:#fff7d9;border:1px dashed #e3cd73;max-width:86%;}
+    .b{max-width:75%;padding:8px 10px;border-radius:10px;line-height:1.45;word-break:break-word;color:#1f2d3d;}
+    .note-tag{display:inline-block;font-size:11px;color:#8a6c00;background:#ffec9e;border-radius:999px;padding:1px 7px;margin-right:6px;}
+    .mentions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+    .mentions i{display:inline-block;font-style:normal;font-size:11px;color:#0f64cb;background:#e9f2ff;border-radius:999px;padding:1px 6px;}
+    .msg-status{display:block;margin-top:4px;font-size:11px;opacity:.75;}
+    .msg-status button{margin-left:6px;border:1px solid #cfd9ea;background:#fff;border-radius:6px;padding:1px 6px;font-size:11px;cursor:pointer;color:#2f7ae5;}
+    .bar{padding:8px;border-top:1px solid #e8eef8;display:flex;gap:8px;}
+    .bar input{flex:1;padding:10px;border:1px solid #cfd9ea;border-radius:8px;}
+    .bar button{padding:10px 14px;background:#2f7ae5;color:#fff;border:0;border-radius:8px;cursor:pointer;}
+    .bar .secondary{background:#5f6f8b;}
+    .bar select{padding:10px;border:1px solid #cfd9ea;border-radius:8px;background:#fff;color:#34455f;}
+    .bar .macro-select{max-width:220px;}
+    .knowledge{border-left:1px solid #e2e8f4;display:flex;flex-direction:column;min-height:0;background:#fcfdff;}
+    .knowledge-head{padding:10px 12px;font-size:13px;color:#4e5f7d;border-bottom:1px solid #e9eef7;background:#f7f9fe;}
+    .knowledge-tools{padding:8px 10px;border-bottom:1px solid #e9eef7;display:flex;flex-direction:column;gap:8px;}
+    .knowledge-tools input,.knowledge-tools select{width:100%;padding:8px;border:1px solid #cfd9ea;border-radius:8px;background:#fff;color:#34455f;font-size:12px;}
+    .knowledge-tools button{padding:7px 10px;border:0;border-radius:8px;background:#2f7ae5;color:#fff;cursor:pointer;font-size:12px;}
+    .knowledge-list{flex:1;overflow:auto;padding:8px;display:flex;flex-direction:column;gap:8px;}
+    .snippet{border:1px solid #dbe4f3;border-radius:10px;padding:8px;background:#fff;}
+    .snippet-meta{font-size:11px;color:#6f80a0;display:flex;justify-content:space-between;gap:8px;}
+    .snippet-text{margin-top:6px;font-size:12px;line-height:1.4;color:#2a3b53;white-space:pre-wrap;word-break:break-word;}
+    .snippet-actions{margin-top:8px;display:flex;justify-content:flex-end;}
+    .snippet-actions button{padding:4px 8px;font-size:12px;border-radius:8px;border:0;background:#2f7ae5;color:#fff;cursor:pointer;}
+    .snippet-empty{font-size:12px;color:#7b8aa6;padding:10px 6px;}
+    @media (max-width: 1100px){.main{grid-template-columns:320px 1fr;} .knowledge{display:none;}}
+    @media (max-width: 900px){.main{grid-template-columns:1fr;} .sidebar{max-height:240px;}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div>客服接待台（多会话）</div>
+      <div class="line">
+        <input id="agentId" value="agent-demo-1" placeholder="agentId" />
+        <button id="refresh">刷新会话列表</button>
+      </div>
+      <div class="meta" id="meta">连接中...</div>
+      <div class="state">
+        <span class="chip" id="wsState">WS: 连接中</span>
+        <span class="chip" id="httpState">HTTP: 未知</span>
+        <span class="chip" id="visitorState">访客状态: 未知</span>
+        <span class="chip" id="typingState">输入状态: 未知</span>
+        <span class="chip" id="sendState">发送队列: 空闲</span>
+        <span class="chip" id="slaState">SLA: 初始化中</span>
+        <span class="chip" id="workloadState">负载: 初始化中</span>
+        <span class="chip" id="analyticsState">分析: 初始化中</span>
+        <span class="chip" id="retryMetrics">重试统计: 初始化中</span>
+      </div>
+    </div>
+    <div class="main">
+      <aside class="sidebar">
+        <div class="side-title">
+          <span>会话列表</span>
+          <div class="toggles">
+            <label class="toggle"><input id="newestFirst" type="checkbox" />最近优先</label>
+            <label class="toggle"><input id="onlyUnread" type="checkbox" />仅看未读</label>
+          </div>
+        </div>
+        <div class="filters">
+          <select id="filterIssueType" title="issueType">
+            <option value="">问题类型(全部)</option>
+            <option value="billing">billing</option>
+            <option value="tech">tech</option>
+            <option value="product">product</option>
+          </select>
+          <select id="filterUrgency" title="urgency">
+            <option value="">紧急程度(全部)</option>
+            <option value="low">low</option>
+            <option value="normal">normal</option>
+            <option value="high">high</option>
+            <option value="urgent">urgent</option>
+          </select>
+          <select id="filterLanguage" title="language">
+            <option value="">语言(全部)</option>
+            <option value="zh-CN">zh-CN</option>
+            <option value="en-US">en-US</option>
+            <option value="ja-JP">ja-JP</option>
+          </select>
+          <select id="filterCustomerTier" title="customerTier">
+            <option value="">客户层级(全部)</option>
+            <option value="standard">standard</option>
+            <option value="enterprise">enterprise</option>
+            <option value="vip">vip</option>
+          </select>
+          <button id="applyAttrFilter" type="button">应用筛选</button>
+          <button id="clearAttrFilter" type="button" class="secondary">清空筛选</button>
+        </div>
+        <div class="session-groups">
+          <section class="group">
+            <div class="group-title failed" id="failedTitle">失败会话</div>
+            <div class="session-list" id="failedList"></div>
+          </section>
+          <section class="group">
+            <div class="group-title unread" id="unreadTitle">未读会话</div>
+            <div class="session-list" id="unreadList"></div>
+          </section>
+          <section class="group">
+            <div class="group-title" id="readTitle">已读会话</div>
+            <div class="session-list" id="readList"></div>
+          </section>
+        </div>
+      </aside>
+      <section class="chat">
+        <div class="chat-head" id="chatHead">请选择左侧会话开始接待</div>
+        <div class="msgs" id="msgs">
+          <div class="chat-load-more" id="loadMoreWrap" style="display:none;"><a id="loadMore" href="javascript:void(0)">点击加载更多记录</a></div>
+        </div>
+        <div class="bar">
+          <input id="txt" placeholder="输入客服回复" />
+          <button id="send">发送回复</button>
+          <button id="sendNote" class="secondary">发送内部备注</button>
+          <select id="macroSelect" class="macro-select" title="宏动作">
+            <option value="">宏动作(可选)</option>
+          </select>
+          <button id="applyMacro" class="secondary">插入宏</button>
+          <select id="retryFilter" title="重试过滤">
+            <option value="all">重试全部失败</option>
+            <option value="ws-timeout">仅重试超时</option>
+            <option value="network">仅重试网络失败</option>
+            <option value="other">仅重试其他错误</option>
+          </select>
+          <button id="exportRetryCsv" class="secondary">导出重试CSV</button>
+          <button id="toggleAutoRetry" class="secondary">暂停自动重试</button>
+          <button id="retryFailed" class="secondary">重试失败</button>
+        </div>
+      </section>
+      <aside class="knowledge">
+        <div class="knowledge-head">知识面板</div>
+        <div class="knowledge-tools">
+          <input id="knowledgeQuery" placeholder="检索片段（如：billing refund）" />
+          <select id="knowledgeGroup" title="知识分组">
+            <option value="">全部分组</option>
+          </select>
+          <button id="refreshKnowledge" type="button">刷新知识</button>
+        </div>
+        <div class="knowledge-list" id="knowledgeList">
+          <div class="snippet-empty">输入关键词或选择会话后自动推荐。</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="./chat-copy.js"></script>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const wsPort = qs.get('wsPort') || '4001';
+    const apiPort = qs.get('apiPort') || '4000';
+    const host = location.hostname || '127.0.0.1';
+    const wsUrl = `ws://${host}:${wsPort}/ws/agent`;
+    const apiBase = `http://${host}:${apiPort}`;
+    const COPY = (window.ChatCopy && window.ChatCopy.agent) || {
+      queueIdle: '发送队列: 空闲',
+      queuePaused: '发送队列: 自动重试已暂停',
+      queueFailedPaused: (count) => `发送队列: ${count} 条失败(自动重试暂停)`,
+      queueFailedPending: (count) => `发送队列: ${count} 条失败待重试`,
+      queueSending: (count) => `发送队列: 发送中 ${count}`,
+      sendingAttempt: (attempt) => `发送中... 第${attempt}次`,
+      failedWithRetry: (retries, reason, retryTip) => `发送失败(已重试${retries}次): ${reason}${retryTip}`,
+      sent: '发送成功',
+      retryOne: '重试此条',
+      pauseAutoRetry: '暂停自动重试',
+      resumeAutoRetry: '恢复自动重试',
+      autoRetryEta: (sec) => `，${sec}s后自动重试`,
+      autoRetryNow: '，可立即重试',
+      exportRetryCsvDone: (count) => `已导出发送重试统计CSV（${count}条）`,
+      sendOkMeta: (sid) => `发送成功 | sessionId=${sid}`,
+      sendFailMeta: '发送失败，已加入发送队列',
+      pausedMeta: '已暂停自动重试，仍可手动重试。',
+      resumedMeta: '已恢复自动重试。'
+    };
+
+    let ws = null;
+    let reconnectDelayMs = 1000;
+    let reconnectTimer = null;
+    let heartbeatTimer = null;
+    let typingClearTimer = null;
+    let lastTypingPayload = '';
+    let activeSession = '';
+    let inboxSessions = [];
+    const unreadMap = JSON.parse(localStorage.getItem('agent_unread_map') || '{}');
+    const seenMap = JSON.parse(localStorage.getItem('agent_seen_map') || '{}');
+    const countedMidMap = JSON.parse(localStorage.getItem('agent_counted_mid_map') || '{}');
+    const pinnedMap = JSON.parse(localStorage.getItem('agent_pinned_map') || '{}');
+    const draftMap = JSON.parse(localStorage.getItem('agent_draft_map') || '{}');
+    const sendQueueBySession = JSON.parse(localStorage.getItem('agent_send_queue') || '{}');
+    const retryMetricsStore = JSON.parse(localStorage.getItem('agent_retry_metrics') || '{"events":[]}');
+    const analyticsTrendStore = JSON.parse(localStorage.getItem('agent_analytics_trend') || '{"samples":[]}');
+    const typingBySession = {};
+    const pendingWsAck = {};
+    const macroMap = {};
+    const attrFilter = {issueType:'', urgency:'', language:'', customerTier:''};
+
+    const failedList = document.getElementById('failedList');
+    const unreadList = document.getElementById('unreadList');
+    const readList = document.getElementById('readList');
+    const failedTitle = document.getElementById('failedTitle');
+    const unreadTitle = document.getElementById('unreadTitle');
+    const readTitle = document.getElementById('readTitle');
+    const newestFirst = document.getElementById('newestFirst');
+    const onlyUnread = document.getElementById('onlyUnread');
+    const chatHead = document.getElementById('chatHead');
+    const meta = document.getElementById('meta');
+    const msgs = document.getElementById('msgs');
+    const loadMoreWrap = document.getElementById('loadMoreWrap');
+    const loadMore = document.getElementById('loadMore');
+    const wsState = document.getElementById('wsState');
+    const httpState = document.getElementById('httpState');
+    const visitorState = document.getElementById('visitorState');
+    const typingState = document.getElementById('typingState');
+    const sendState = document.getElementById('sendState');
+    const slaState = document.getElementById('slaState');
+    const workloadState = document.getElementById('workloadState');
+    const analyticsState = document.getElementById('analyticsState');
+    const retryMetrics = document.getElementById('retryMetrics');
+    const retryFilter = document.getElementById('retryFilter');
+    const macroSelect = document.getElementById('macroSelect');
+    const applyMacroBtn = document.getElementById('applyMacro');
+    const sendNoteBtn = document.getElementById('sendNote');
+    const exportRetryCsvBtn = document.getElementById('exportRetryCsv');
+    const toggleAutoRetryBtn = document.getElementById('toggleAutoRetry');
+    const retryFailedBtn = document.getElementById('retryFailed');
+    const filterIssueType = document.getElementById('filterIssueType');
+    const filterUrgency = document.getElementById('filterUrgency');
+    const filterLanguage = document.getElementById('filterLanguage');
+    const filterCustomerTier = document.getElementById('filterCustomerTier');
+    const applyAttrFilterBtn = document.getElementById('applyAttrFilter');
+    const clearAttrFilterBtn = document.getElementById('clearAttrFilter');
+    const knowledgeQuery = document.getElementById('knowledgeQuery');
+    const knowledgeGroup = document.getElementById('knowledgeGroup');
+    const refreshKnowledgeBtn = document.getElementById('refreshKnowledge');
+    const knowledgeList = document.getElementById('knowledgeList');
+
+    let knowledgeCache = [];
+    let inboxRefreshInFlight = false;
+
+    sendState.textContent = COPY.queueIdle;
+    toggleAutoRetryBtn.textContent = COPY.pauseAutoRetry;
+
+    let newestFirstMode = localStorage.getItem('agent_newest_first') !== '0';
+    let onlyUnreadMode = localStorage.getItem('agent_only_unread') === '1';
+    const historyLimitBySession = {};
+    const messageTokenBySession = {};
+    const typingPriorityWindowSec = 8;
+    let autoRetryPaused = localStorage.getItem('agent_auto_retry_paused') === '1';
+    newestFirst.checked = newestFirstMode;
+    onlyUnread.checked = onlyUnreadMode;
+
+    Object.keys(sendQueueBySession).forEach((sid) => {
+      const items = Array.isArray(sendQueueBySession[sid]) ? sendQueueBySession[sid] : [];
+      sendQueueBySession[sid] = items.map((item) => {
+        if(item && item.status === 'sending') return {...item, status:'failed', inflight:false};
+        return item;
+      }).filter(Boolean);
+    });
+
+    function f(obj, key){
+      if(!obj || typeof obj !== 'object') return undefined;
+      if (obj[key] !== undefined) return obj[key];
+      const nk = String(key).toLowerCase().replace(/[-_]/g, '');
+      for (const k of Object.keys(obj)) {
+        if (String(k).toLowerCase().replace(/[-_]/g, '') === nk) return obj[k];
+      }
+      return undefined;
+    }
+
+    function addMsg(sender, content, autoScroll, statusText, opts){
+      const row = document.createElement('div');
+      const note = !!(opts && opts.isInternalNote);
+      row.className = `m ${note ? 'note' : (sender === 'agent' ? 'a':'v')}`;
+      const bubble = document.createElement('div');
+      bubble.className='b';
+      if(note){
+        const tag = document.createElement('span');
+        tag.className = 'note-tag';
+        tag.textContent = '内部备注';
+        bubble.appendChild(tag);
+      }
+      const text = (content === undefined || content === null) ? '' : String(content);
+      const textNode = document.createElement('span');
+      textNode.textContent = text.trim() === '' ? '[空消息]' : text;
+      bubble.appendChild(textNode);
+      if(note && opts && Array.isArray(opts.mentions) && opts.mentions.length > 0){
+        const mentionWrap = document.createElement('div');
+        mentionWrap.className = 'mentions';
+        opts.mentions.forEach((m) => {
+          const chip = document.createElement('i');
+          chip.textContent = `@${String(m || '').trim()}`;
+          mentionWrap.appendChild(chip);
+        });
+        bubble.appendChild(mentionWrap);
+      }
+      if(statusText){
+        const s = document.createElement('span');
+        s.className = 'msg-status';
+        s.textContent = statusText;
+        bubble.appendChild(s);
+      }
+      row.appendChild(bubble);
+      msgs.appendChild(row);
+      if(autoScroll !== false){
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+      return row;
+    }
+
+    function renderQueuedAgentItem(item){
+      let marker = '';
+      if(item.status === 'sending'){
+        marker = COPY.sendingAttempt(Number(item.retries || 0) + 1);
+      } else if(item.status === 'failed'){
+        const reason = String(item.lastError || 'unknown');
+        const leftMs = Math.max(0, Number(item.nextRetryAt || 0) - Date.now());
+        const leftSec = Math.ceil(leftMs / 1000);
+        const retryTip = leftSec > 0 ? COPY.autoRetryEta(leftSec) : COPY.autoRetryNow;
+        marker = COPY.failedWithRetry(Number(item.retries || 0), reason, retryTip);
+      } else {
+        marker = COPY.sent;
+      }
+      const noteMentions = String(item.content || '')
+        .split(/\s+/)
+        .filter((x) => /^@[A-Za-z0-9_.-]{1,64}$/.test(x))
+        .map((x) => x.slice(1));
+      const row = addMsg('agent', item.content, false, marker, {
+        isInternalNote: String(item.messageType || 'text').toLowerCase() === 'internal_note',
+        mentions: noteMentions
+      });
+      if(item.status === 'failed'){
+        const statusEl = row.querySelector('.msg-status');
+        if(statusEl){
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = COPY.retryOne;
+          btn.onclick = () => retryOneQueued(item.sessionId, item.localId);
+          statusEl.appendChild(btn);
+        }
+      }
+    }
+
+    function getHistoryLimit(sid){
+      if(!sid) return 20;
+      if(!historyLimitBySession[sid]) historyLimitBySession[sid] = 20;
+      return historyLimitBySession[sid];
+    }
+
+    function setHistoryLimit(sid, value){
+      if(!sid) return;
+      historyLimitBySession[sid] = Math.max(20, Math.min(200, Number(value) || 20));
+    }
+
+    function bumpHistoryLimit(){
+      if(!activeSession) return;
+      const next = getHistoryLimit(activeSession) + 20;
+      setHistoryLimit(activeSession, next);
+      pollMessages(true);
+    }
+
+    function messageToken(parsed){
+      if(!Array.isArray(parsed) || parsed.length === 0) return '0';
+      const first = parsed[0];
+      const last = parsed[parsed.length - 1];
+      return `${parsed.length}|${String(first.sender)}|${String(first.content)}|${String(last.sender)}|${String(last.content)}`;
+    }
+
+    function saveInboxState(){
+      localStorage.setItem('agent_unread_map', JSON.stringify(unreadMap));
+      localStorage.setItem('agent_seen_map', JSON.stringify(seenMap));
+      localStorage.setItem('agent_counted_mid_map', JSON.stringify(countedMidMap));
+      localStorage.setItem('agent_pinned_map', JSON.stringify(pinnedMap));
+    }
+
+    function dedupeSessionsById(items){
+      const map = {};
+      (Array.isArray(items) ? items : []).forEach((s) => {
+        const sid = String(f(s, 'sessionId') || '');
+        if(!sid) return;
+        const prev = map[sid];
+        if(!prev){
+          map[sid] = s;
+          return;
+        }
+        if(sessionSortKey(s) >= sessionSortKey(prev)){
+          map[sid] = s;
+        }
+      });
+      return Object.keys(map).map((k) => map[k]);
+    }
+
+    function saveDraftState(){
+      localStorage.setItem('agent_draft_map', JSON.stringify(draftMap));
+    }
+
+    function saveSendQueueState(){
+      localStorage.setItem('agent_send_queue', JSON.stringify(sendQueueBySession));
+    }
+
+    function saveRetryMetrics(){
+      localStorage.setItem('agent_retry_metrics', JSON.stringify(retryMetricsStore));
+    }
+
+    function saveAnalyticsTrend(){
+      localStorage.setItem('agent_analytics_trend', JSON.stringify(analyticsTrendStore));
+    }
+
+    function recordAnalyticsSample(myHandoff, myTouches){
+      const now = Date.now();
+      if(!Array.isArray(analyticsTrendStore.samples)) analyticsTrendStore.samples = [];
+      const last = analyticsTrendStore.samples[analyticsTrendStore.samples.length - 1];
+      const h = Math.max(0, Number(myHandoff || 0));
+      const t = Math.max(0, Number(myTouches || 0));
+      const shouldAppend = !last
+        || (now - Number(last.ts || 0)) >= 10000
+        || Number(last.h || 0) !== h
+        || Number(last.t || 0) !== t;
+      if(shouldAppend){
+        analyticsTrendStore.samples.push({ts: now, h, t});
+        const cutoff = now - (10 * 60 * 1000);
+        analyticsTrendStore.samples = analyticsTrendStore.samples.filter((x) => Number(x.ts || 0) >= cutoff);
+        saveAnalyticsTrend();
+      }
+    }
+
+    function recentAnalyticsDelta(windowMs){
+      const ms = Number(windowMs || 5 * 60 * 1000);
+      const samples = Array.isArray(analyticsTrendStore.samples) ? analyticsTrendStore.samples : [];
+      if(samples.length === 0) return {dHandoff: 0, dTouches: 0};
+      const now = Date.now();
+      const current = samples[samples.length - 1];
+      const threshold = now - ms;
+      let base = null;
+      for(let i = 0; i < samples.length; i += 1){
+        const s = samples[i];
+        if(Number(s.ts || 0) >= threshold){
+          base = s;
+          break;
+        }
+      }
+      if(!base) base = samples[0];
+      return {
+        dHandoff: Math.max(0, Number(current.h || 0) - Number(base.h || 0)),
+        dTouches: Math.max(0, Number(current.t || 0) - Number(base.t || 0))
+      };
+    }
+
+    function analyticsSparklineByKey(windowMs, bucketCount, key){
+      const ms = Math.max(60000, Number(windowMs || 5 * 60 * 1000));
+      const buckets = Math.max(5, Number(bucketCount || 8));
+      const samples = Array.isArray(analyticsTrendStore.samples) ? analyticsTrendStore.samples : [];
+      if(samples.length < 2) return '.'.repeat(buckets);
+
+      const now = Date.now();
+      const start = now - ms;
+      const bucketSpan = ms / buckets;
+      const values = new Array(buckets).fill(0);
+
+      for(let i = 1; i < samples.length; i += 1){
+        const prev = samples[i - 1];
+        const cur = samples[i];
+        const ts = Number(cur.ts || 0);
+        if(ts < start || ts > now) continue;
+        const prevVal = Number(prev[key] || 0);
+        const curVal = Number(cur[key] || 0);
+        const step = Math.max(0, curVal - prevVal);
+        const idx = Math.min(buckets - 1, Math.max(0, Math.floor((ts - start) / bucketSpan)));
+        values[idx] += step;
+      }
+
+      const maxv = Math.max(0, ...values);
+      if(maxv <= 0) return '.'.repeat(buckets);
+      const levels = ['.', '-', '=', '*', '#'];
+      return values.map((v) => {
+        const ratio = v / maxv;
+        const li = Math.min(levels.length - 1, Math.floor(ratio * (levels.length - 1) + 0.0001));
+        return levels[li];
+      }).join('');
+    }
+
+    function analyticsSparkline(windowMs, bucketCount){
+      return analyticsSparklineByKey(windowMs, bucketCount, 'h');
+    }
+
+    function analyticsSparklineTouches(windowMs, bucketCount){
+      return analyticsSparklineByKey(windowMs, bucketCount, 't');
+    }
+
+    function txtEl(){
+      return document.getElementById('txt');
+    }
+
+    function ensureSendQueue(sid){
+      if(!sid) return [];
+      if(!Array.isArray(sendQueueBySession[sid])) sendQueueBySession[sid] = [];
+      return sendQueueBySession[sid];
+    }
+
+    function queueStats(){
+      let sending = 0;
+      let failed = 0;
+      Object.keys(sendQueueBySession).forEach((sid) => {
+        ensureSendQueue(sid).forEach((item) => {
+          if(item.status === 'sending') sending += 1;
+          else if(item.status === 'failed') failed += 1;
+        });
+      });
+      return {sending, failed};
+    }
+
+    function classifyErrorType(err){
+      const t = String(err || '').toLowerCase();
+      if(t.includes('ws-ack-timeout')) return 'ws-timeout';
+      if(t.includes('network') || t.includes('http') || t.includes('unavailable')) return 'network';
+      return 'other';
+    }
+
+    function retryDelayMs(retries){
+      const n = Math.max(1, Number(retries || 1));
+      const base = Math.min(30000, 1200 * Math.pow(2, Math.min(6, n - 1)));
+      return base + Math.floor(Math.random() * 400);
+    }
+
+    function failedCountForSession(sid){
+      return ensureSendQueue(sid).filter((x) => x && x.status === 'failed').length;
+    }
+
+    function latestFailedForSession(sid){
+      const failed = ensureSendQueue(sid)
+        .filter((x) => x && x.status === 'failed')
+        .sort((a, b) => Number(b.lastTryAt || b.createdAt || 0) - Number(a.lastTryAt || a.createdAt || 0));
+      return failed[0] || null;
+    }
+
+    function recordRetryEvent(kind, item, recovered){
+      const ev = {
+        ts: Date.now(),
+        kind,
+        sessionId: String((item && item.sessionId) || ''),
+        errorType: String((item && item.errorType) || ''),
+        retries: Number(item && item.retries ? item.retries : 1),
+        recovered: !!recovered
+      };
+      if(!Array.isArray(retryMetricsStore.events)) retryMetricsStore.events = [];
+      retryMetricsStore.events.push(ev);
+      const cutoff = Date.now() - (30 * 60 * 1000);
+      retryMetricsStore.events = retryMetricsStore.events.filter((x) => Number(x.ts || 0) >= cutoff);
+      saveRetryMetrics();
+      updateRetryMetricsChip();
+    }
+
+    function updateRetryMetricsChip(){
+      const now = Date.now();
+      const windowStart = now - (5 * 60 * 1000);
+      const events = (Array.isArray(retryMetricsStore.events) ? retryMetricsStore.events : []).filter((x) => Number(x.ts || 0) >= windowStart);
+      if(events.length === 0){
+        setChip(retryMetrics, '重试统计(5m): 暂无样本', 'warn');
+        return;
+      }
+      const total = events.length;
+      const fail = events.filter((x) => x.kind === 'fail').length;
+      const success = events.filter((x) => x.kind === 'success').length;
+      const recovered = events.filter((x) => x.kind === 'success' && x.recovered).length;
+      const retryAvg = events.reduce((acc, x) => acc + Number(x.retries || 1), 0) / total;
+      const failRate = Math.round((fail * 1000) / Math.max(1, total)) / 10;
+      const recoverRate = Math.round((recovered * 1000) / Math.max(1, success)) / 10;
+      const text = `重试统计(5m): 失败率${failRate}% | 平均重试${retryAvg.toFixed(1)}次 | 回补率${recoverRate}%`;
+      const kind = failRate >= 30 ? 'bad' : (failRate >= 10 ? 'warn' : 'ok');
+      setChip(retryMetrics, text, kind);
+    }
+
+    function applyAutoRetryButtonState(){
+      toggleAutoRetryBtn.textContent = autoRetryPaused ? COPY.resumeAutoRetry : COPY.pauseAutoRetry;
+      toggleAutoRetryBtn.className = `secondary ${autoRetryPaused ? 'warn' : ''}`;
+      const pausedText = autoRetryPaused ? COPY.queuePaused : null;
+      if(pausedText && queueStats().failed > 0){
+        setChip(sendState, pausedText, 'warn');
+      } else {
+        updateSendStateChip();
+      }
+    }
+
+    function exportRetryMetricsCsv(){
+      const events = Array.isArray(retryMetricsStore.events) ? retryMetricsStore.events.slice() : [];
+      const header = 'timestamp,sessionId,kind,errorType,retries,recovered';
+      const lines = events.map((ev) => {
+        const ts = new Date(Number(ev.ts || 0)).toISOString();
+        const sid = String(ev.sessionId || '').replace(/"/g, '""');
+        const kind = String(ev.kind || '').replace(/"/g, '""');
+        const err = String(ev.errorType || '').replace(/"/g, '""');
+        const retries = Number(ev.retries || 1);
+        const recovered = ev.recovered ? '1' : '0';
+        return `${ts},"${sid}","${kind}","${err}",${retries},${recovered}`;
+      });
+      const csv = [header].concat(lines).join('\n');
+      const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `agent-retry-metrics-${Date.now()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      meta.textContent = COPY.exportRetryCsvDone(lines.length);
+    }
+
+    function trendBucketsForSession(sid){
+      const now = Date.now();
+      const bucketMs = 2 * 60 * 1000;
+      const buckets = [0, 0, 0, 0, 0];
+      const events = Array.isArray(retryMetricsStore.events) ? retryMetricsStore.events : [];
+      events.forEach((ev) => {
+        if(String(ev.kind || '') !== 'fail') return;
+        if(String(ev.sessionId || '') !== String(sid || '')) return;
+        const age = now - Number(ev.ts || 0);
+        if(age < 0 || age > bucketMs * buckets.length) return;
+        const idx = buckets.length - 1 - Math.floor(age / bucketMs);
+        if(idx >= 0 && idx < buckets.length) buckets[idx] += 1;
+      });
+      return buckets;
+    }
+
+    function renderTrendForSession(itemEl, sid){
+      const arr = trendBucketsForSession(sid);
+      const maxv = Math.max(1, ...arr);
+      const trend = document.createElement('div');
+      trend.className = 'trend';
+      trend.title = `失败趋势(10m): ${arr.join('/')}`;
+      arr.forEach((v) => {
+        const bar = document.createElement('i');
+        const h = 3 + Math.round((v / maxv) * 13);
+        bar.style.height = `${h}px`;
+        if(v >= maxv && v > 0) bar.className = 'hot';
+        trend.appendChild(bar);
+      });
+      itemEl.appendChild(trend);
+    }
+
+    function updateSendStateChip(){
+      const s = queueStats();
+      if(s.failed > 0){
+        if(autoRetryPaused){
+          setChip(sendState, COPY.queueFailedPaused(s.failed), 'warn');
+        } else {
+          setChip(sendState, COPY.queueFailedPending(s.failed), 'bad');
+        }
+      } else if(s.sending > 0){
+        setChip(sendState, COPY.queueSending(s.sending), 'warn');
+      } else {
+        setChip(sendState, COPY.queueIdle, 'ok');
+      }
+    }
+
+    function hasAttrFilter(){
+      return !!(attrFilter.issueType || attrFilter.urgency || attrFilter.language || attrFilter.customerTier);
+    }
+
+    function buildAttrFilterQuery(){
+      const params = new URLSearchParams();
+      if(attrFilter.issueType) params.set('issueType', attrFilter.issueType);
+      if(attrFilter.urgency) params.set('urgency', attrFilter.urgency);
+      if(attrFilter.language) params.set('language', attrFilter.language);
+      if(attrFilter.customerTier) params.set('customerTier', attrFilter.customerTier);
+      return params.toString();
+    }
+
+    async function fetchFilteredSessionIdSet(){
+      if(!hasAttrFilter()) return null;
+      const query = buildAttrFilterQuery();
+      try{
+        const r = await fetch(`${apiBase}/api/v1/sessions/attributes?${query}`);
+        const j = await r.json();
+        const items = f(j, 'items');
+        if(!Array.isArray(items)) return new Set();
+        const ids = items.map((x) => String(f(x, 'sessionId') || '')).filter(Boolean);
+        return new Set(ids);
+      }catch(_e){
+        return new Set();
+      }
+    }
+
+    async function refreshMacros(){
+      try{
+        const r = await fetch(`${apiBase}/api/v1/macros`);
+        const j = await r.json();
+        const items = f(j, 'items');
+        if(!Array.isArray(items)) return;
+        macroSelect.innerHTML = '<option value="">宏动作(可选)</option>';
+        Object.keys(macroMap).forEach((k) => delete macroMap[k]);
+        items.forEach((it) => {
+          const id = String(f(it, 'macroId') || '');
+          const title = String(f(it, 'title') || id || 'macro');
+          if(!id) return;
+          const op = document.createElement('option');
+          op.value = id;
+          op.textContent = title;
+          macroSelect.appendChild(op);
+          macroMap[id] = it;
+        });
+      }catch(_e){
+      }
+    }
+
+    function applySelectedMacro(){
+      const id = String(macroSelect.value || '');
+      if(!id || !macroMap[id]){
+        meta.textContent = '请选择宏动作后再插入';
+        return;
+      }
+      const m = macroMap[id] || {};
+      const tpl = String(f(m, 'replyTemplate') || '').trim();
+      if(!tpl){
+        meta.textContent = '该宏无可插入模板';
+        return;
+      }
+      const current = txtEl().value || '';
+      txtEl().value = current ? `${current}\n${tpl}` : tpl;
+      txtEl().focus();
+      if(activeSession){
+        draftMap[activeSession] = txtEl().value;
+        saveDraftState();
+      }
+      meta.textContent = `已插入宏: ${String(f(m, 'title') || id)}`;
+    }
+
+    async function refreshKnowledgeGroups(){
+      try{
+        const r = await fetch(`${apiBase}/api/v1/quick-reply-groups`);
+        const j = await r.json();
+        const groups = f(j, 'groups');
+        if(!Array.isArray(groups)) return;
+        const old = String(knowledgeGroup.value || '');
+        knowledgeGroup.innerHTML = '<option value="">全部分组</option>';
+        groups.forEach((g) => {
+          const gid = String(f(g, 'groupId') || '');
+          const name = String(f(g, 'name') || gid || '分组');
+          if(!gid) return;
+          const op = document.createElement('option');
+          op.value = gid;
+          op.textContent = name;
+          knowledgeGroup.appendChild(op);
+        });
+        if(old) knowledgeGroup.value = old;
+      }catch(_e){
+      }
+    }
+
+    function activeSessionContext(){
+      const sid = String(activeSession || '');
+      if(!sid) return null;
+      return inboxSessions.find((s) => String(f(s, 'sessionId') || '') === sid) || null;
+    }
+
+    function applySnippetTemplate(raw){
+      const text = String(raw || '');
+      const session = activeSessionContext() || {};
+      const prechat = f(session, 'prechat') || {};
+      const replacements = {
+        sessionId: String(activeSession || ''),
+        issueType: String(f(prechat, 'issueType') || ''),
+        urgency: String(f(prechat, 'urgency') || ''),
+        language: String(f(prechat, 'language') || ''),
+        customerTier: String(f(prechat, 'customerTier') || ''),
+        intentScore: String(f(session, 'intentScore') || ''),
+        agentId: String(document.getElementById('agentId').value || '').trim()
+      };
+      return text.replace(/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/g, (_m, key) => {
+        const k = String(key || '');
+        return Object.prototype.hasOwnProperty.call(replacements, k) ? replacements[k] : '';
+      });
+    }
+
+    function insertSnippet(content){
+      const tpl = applySnippetTemplate(content);
+      const current = txtEl().value || '';
+      txtEl().value = current ? `${current}\n${tpl}` : tpl;
+      txtEl().focus();
+      if(activeSession){
+        draftMap[activeSession] = txtEl().value;
+        saveDraftState();
+      }
+      meta.textContent = '已插入知识片段';
+    }
+
+    function renderKnowledgeList(items){
+      knowledgeList.innerHTML = '';
+      if(!Array.isArray(items) || items.length === 0){
+        const empty = document.createElement('div');
+        empty.className = 'snippet-empty';
+        empty.textContent = '未命中知识片段，可尝试更短关键词。';
+        knowledgeList.appendChild(empty);
+        return;
+      }
+      items.forEach((it) => {
+        const box = document.createElement('div');
+        box.className = 'snippet';
+        const gid = String(f(it, 'groupName') || f(it, 'groupId') || 'default');
+        const score = Number(f(it, 'score') || 0);
+        const content = String(f(it, 'content') || '');
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'snippet-meta';
+        const left = document.createElement('span');
+        left.textContent = gid;
+        const right = document.createElement('span');
+        right.textContent = `score ${score}`;
+        metaEl.appendChild(left);
+        metaEl.appendChild(right);
+
+        const textEl = document.createElement('div');
+        textEl.className = 'snippet-text';
+        textEl.textContent = content;
+
+        const actions = document.createElement('div');
+        actions.className = 'snippet-actions';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = '插入';
+        btn.onclick = () => insertSnippet(content);
+        actions.appendChild(btn);
+
+        box.appendChild(metaEl);
+        box.appendChild(textEl);
+        box.appendChild(actions);
+        knowledgeList.appendChild(box);
+      });
+    }
+
+    async function refreshKnowledgeList(forceQuery){
+      const sidCtx = activeSessionContext() || {};
+      const prechat = f(sidCtx, 'prechat') || {};
+      const q = String(forceQuery !== undefined ? forceQuery : (knowledgeQuery.value || '')).trim();
+      const autoQ = !q
+        ? [String(f(prechat, 'issueType') || ''), String(f(prechat, 'urgency') || ''), String(f(prechat, 'customerTier') || '')]
+            .filter(Boolean)
+            .join(' ')
+        : q;
+      const params = new URLSearchParams();
+      if(autoQ) params.set('q', autoQ);
+      if(String(knowledgeGroup.value || '').trim()) params.set('groupId', String(knowledgeGroup.value || '').trim());
+      params.set('limit', '20');
+      try{
+        const r = await fetch(`${apiBase}/api/v1/knowledge/snippets?${params.toString()}`);
+        const j = await r.json();
+        const items = f(j, 'items');
+        if(Array.isArray(items)){
+          knowledgeCache = items;
+          renderKnowledgeList(items);
+        }
+      }catch(_e){
+        renderKnowledgeList([]);
+      }
+    }
+
+    function persistCurrentDraft(){
+      if(!activeSession) return;
+      draftMap[activeSession] = txtEl().value || '';
+      saveDraftState();
+    }
+
+    function restoreDraftForSession(sid){
+      txtEl().value = String(draftMap[sid] || '');
+    }
+
+    function clearDraftForSession(sid){
+      if(!sid) return;
+      delete draftMap[sid];
+      saveDraftState();
+    }
+
+    function sendTyping(content){
+      if(!activeSession || !ws || ws.readyState !== 1) return;
+      const payload = String(content || '').slice(0, 64);
+      if(payload === lastTypingPayload) return;
+      lastTypingPayload = payload;
+      ws.send(JSON.stringify({event:'typing', payload:{sessionId:activeSession, content:payload}}));
+    }
+
+    function startHeartbeat(){
+      if(heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        if(ws && ws.readyState === 1){
+          ws.send(JSON.stringify({event:'ping', payload:{at:Date.now()}}));
+        }
+      }, 20000);
+    }
+
+    function stopHeartbeat(){
+      if(heartbeatTimer){
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+    }
+
+    function scheduleReconnect(){
+      if(reconnectTimer) clearTimeout(reconnectTimer);
+      const delay = Math.min(10000, reconnectDelayMs) + Math.floor(Math.random() * 400);
+      reconnectTimer = setTimeout(connect, delay);
+      reconnectDelayMs = Math.min(10000, reconnectDelayMs * 2);
+      meta.textContent = `连接已断开，${Math.ceil(delay / 1000)}秒后重连...`;
+    }
+
+    function msgField(msg, key){
+      const direct = f(msg, key);
+      if(direct !== undefined) return direct;
+      if(Array.isArray(msg)){
+        for(let i=0;i<msg.length-1;i+=2){
+          const k = String(msg[i] || '').replace(/^:/,'').toLowerCase().replace(/[-_]/g,'');
+          const target = String(key).toLowerCase().replace(/[-_]/g,'');
+          if(k === target) return msg[i+1];
+        }
+      }
+      return undefined;
+    }
+
+    function extractMsg(msg){
+      if(msg === undefined || msg === null) return null;
+      if(typeof msg === 'string'){
+        const t = msg.trim();
+        return t ? { sender:'visitor', content:t } : null;
+      }
+
+      const sender =
+        msgField(msg, 'senderType') ??
+        msgField(msg, 'sender') ??
+        msgField(msg, 'role') ??
+        'visitor';
+
+      let content =
+        msgField(msg, 'content') ??
+        msgField(msg, 'message') ??
+        msgField(msg, 'text') ??
+        msgField(msg, 'body');
+
+      if(content && typeof content === 'object'){
+        content =
+          msgField(content, 'content') ??
+          msgField(content, 'text') ??
+          msgField(content, 'message') ??
+          JSON.stringify(content);
+      }
+
+      if(content === undefined || content === null) return null;
+      const text = String(content).trim();
+      if(!text) return null;
+      const messageType = String(msgField(msg, 'messageType') ?? msgField(msg, 'message-type') ?? 'text').toLowerCase();
+      let mentions = msgField(msg, 'mentions') ?? msgField(msg, 'mentionList') ?? [];
+      if(!Array.isArray(mentions)) mentions = [];
+      mentions = mentions.map((x) => String(x || '').trim()).filter(Boolean);
+      return {
+        sender: String(sender || 'visitor').toLowerCase(),
+        content: text,
+        messageType,
+        mentions
+      };
+    }
+
+    function setChip(el, text, kind){
+      el.textContent = text;
+      el.className = `chip ${kind || ''}`;
+    }
+
+    function fmtAge(sec){
+      if(sec === undefined || sec === null) return '未知';
+      return `${Math.max(0, Number(sec)||0)}s`;
+    }
+
+    function fmtLocalTime(unixSec){
+      if(unixSec === undefined || unixSec === null) return '未知';
+      const d = new Date(Number(unixSec) * 1000);
+      if(Number.isNaN(d.getTime())) return '未知';
+      return d.toLocaleString('zh-CN', {hour12:false});
+    }
+
+    function toNum(v){
+      if(v === undefined || v === null) return 0;
+      if(typeof v === 'number') return Number.isFinite(v) ? v : 0;
+      if(typeof v === 'string'){
+        const n = Number(v);
+        if(Number.isFinite(n)) return n;
+        const t = Date.parse(v);
+        if(Number.isFinite(t)) return Math.floor(t / 1000);
+      }
+      return 0;
+    }
+
+    function sessionSlaState(s){
+      const sla = f(s, 'sla') || {};
+      const state = String(f(sla, 'state') || 'healthy').toLowerCase();
+      if(state === 'breached') return 'breached';
+      if(state === 'at-risk') return 'at-risk';
+      return 'healthy';
+    }
+
+    function sessionSlaRank(s){
+      const state = sessionSlaState(s);
+      if(state === 'breached') return 2;
+      if(state === 'at-risk') return 1;
+      return 0;
+    }
+
+    function sessionIntentScore(s){
+      return Math.max(0, Math.min(100, Number(f(s, 'intentScore') || 0)));
+    }
+
+    function sessionIntentRank(s){
+      const score = sessionIntentScore(s);
+      if(score >= 80) return 2;
+      if(score >= 55) return 1;
+      return 0;
+    }
+
+    function updateSlaChip(summary){
+      const s = summary || {};
+      const breached = Number(f(s, 'breached') || 0);
+      const atRisk = Number(f(s, 'atRisk') || 0);
+      const healthy = Number(f(s, 'healthy') || 0);
+      const text = `SLA: 风险${atRisk} | 超时${breached} | 健康${healthy}`;
+      const kind = breached > 0 ? 'bad' : (atRisk > 0 ? 'warn' : 'ok');
+      setChip(slaState, text, kind);
+    }
+
+    function updateWorkloadChip(summary){
+      const s = summary || {};
+      const online = Number(f(s, 'onlineAgents') || 0);
+      const myLoad = Number(f(s, 'currentLoad') || 0);
+      const myCap = Number(f(s, 'currentCapacity') || 0);
+      const assigned = Number(f(s, 'currentAssignedActive') || 0);
+      const text = `负载: 在线${online}人 | 我 ${myLoad}/${myCap} | 在接${assigned}`;
+      const utilization = myCap > 0 ? (myLoad / myCap) : 0;
+      const kind = utilization >= 1 ? 'bad' : (utilization >= 0.75 ? 'warn' : 'ok');
+      setChip(workloadState, text, kind);
+    }
+
+    function updateAnalyticsChip(overview){
+      const o = overview || {};
+      const routing = f(o, 'routingDashboard') || {};
+      const touches = f(o, 'touchesDashboard') || {};
+      const mine = f(o, 'currentAgent') || {};
+      const handoff = Number(f(routing, 'handoffTotal') || 0);
+      const reopen = Number(f(routing, 'reopenTotal') || 0);
+      const totalTouches = Number(f(touches, 'totalTouches') || 0);
+      const myHandoff = Number(f(mine, 'myHandoff') || 0);
+      const myTouches = Number(f(mine, 'myTouches') || 0);
+      recordAnalyticsSample(myHandoff, myTouches);
+      const delta = recentAnalyticsDelta(5 * 60 * 1000);
+      const trendH = analyticsSparkline(5 * 60 * 1000, 8);
+      const trendT = analyticsSparklineTouches(5 * 60 * 1000, 8);
+      const text = `分析: 转接${handoff} | reopen${reopen} | touches${totalTouches} | 我:${myHandoff}/${myTouches} | 5m:+${delta.dHandoff}/+${delta.dTouches} | H:${trendH} T:${trendT}`;
+      const kind = reopen > 0 ? 'warn' : 'ok';
+      setChip(analyticsState, text, kind);
+    }
+
+    function sessionSortKey(s){
+      const latest = f(s, 'latestMessage') || {};
+      const ts =
+        toNum(f(latest, 'createdAtUnix')) ||
+        toNum(f(latest, 'createdAt')) ||
+        toNum(f(latest, 'sentAtUnix')) ||
+        toNum(f(latest, 'timestamp')) ||
+        toNum(f(s, 'lastActiveUnix')) ||
+        toNum(f(s, 'updatedAtUnix'));
+      if(ts > 0) return ts;
+
+      const mid = String(f(latest, 'messageId') || '');
+      const m = mid.match(/(\d{8,})/);
+      return m ? Number(m[1]) : 0;
+    }
+
+    function setTypingSnapshotForSession(sid, typing){
+      if(!sid) return;
+      const t = typing || {};
+      if(!f(t, 'active')){
+        delete typingBySession[sid];
+        return;
+      }
+      typingBySession[sid] = {
+        active: true,
+        from: String(f(t, 'from') || ''),
+        content: String(f(t, 'content') || ''),
+        ageSec: Number(f(t, 'ageSec') || 0)
+      };
+    }
+
+    function typingPriorityScore(sid){
+      const t = typingBySession[sid];
+      if(!t || !t.active) return 0;
+      if(String(t.from || '').toLowerCase() !== 'visitor') return 0;
+      return Number(t.ageSec || 9999) <= typingPriorityWindowSec ? 1 : 0;
+    }
+
+    function sortSessions(sessions){
+      if(!newestFirstMode) return sessions;
+      return sessions.slice().sort((a, b) => {
+        const asid = String(f(a, 'sessionId') || '');
+        const bsid = String(f(b, 'sessionId') || '');
+        const afailed = failedCountForSession(asid) > 0 ? 1 : 0;
+        const bfailed = failedCountForSession(bsid) > 0 ? 1 : 0;
+        if(afailed !== bfailed) return bfailed - afailed;
+        const aunread = Number(unreadMap[asid] || 0) > 0 ? 1 : 0;
+        const bunread = Number(unreadMap[bsid] || 0) > 0 ? 1 : 0;
+        if(aunread !== bunread) return bunread - aunread;
+        const aintent = sessionIntentRank(a);
+        const bintent = sessionIntentRank(b);
+        if(aintent !== bintent) return bintent - aintent;
+        const asla = sessionSlaRank(a);
+        const bsla = sessionSlaRank(b);
+        if(asla !== bsla) return bsla - asla;
+        const at = typingPriorityScore(asid);
+        const bt = typingPriorityScore(bsid);
+        if(at !== bt) return bt - at;
+        const ap = pinnedMap[asid] ? 1 : 0;
+        const bp = pinnedMap[bsid] ? 1 : 0;
+        if(ap !== bp) return bp - ap;
+        return sessionSortKey(b) - sessionSortKey(a);
+      });
+    }
+
+    function buildSessionItem(s){
+      const sid = f(s, 'sessionId') || '';
+      const latest = f(s, 'latestMessage') || {};
+      const latestText = f(latest, 'content') || '暂无消息';
+      const prechat = f(s, 'prechat') || {};
+      const intentScore = sessionIntentScore(s);
+      const unread = Number(unreadMap[sid] || 0);
+      const pinned = !!pinnedMap[sid];
+      const typing = typingBySession[sid];
+      const showTyping = !!(typing && typing.active && String(typing.from || '').toLowerCase() === 'visitor');
+
+      const item = document.createElement('div');
+      item.className = `session-item ${sid === activeSession ? 'active' : ''} ${unread > 0 ? 'unread' : ''}`;
+
+      const sidRow = document.createElement('div');
+      sidRow.className = 'sid';
+
+      const sidLeft = document.createElement('span');
+      sidLeft.className = 'sid-left';
+      sidLeft.textContent = sid;
+
+      const sidRight = document.createElement('span');
+      sidRight.className = 'sid-right';
+
+      if(unread > 0){
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = String(unread);
+        sidRight.appendChild(badge);
+      }
+
+      const failed = failedCountForSession(sid);
+      if(failed > 0){
+        const failBadge = document.createElement('span');
+        failBadge.className = 'badge fail';
+        failBadge.title = '失败待发数量';
+        failBadge.textContent = `!${failed}`;
+        sidRight.appendChild(failBadge);
+        const lf = latestFailedForSession(sid);
+        if(lf){
+          item.title = `待重发 ${failed} 条 | 最近错误: ${String(lf.lastError || 'unknown')}`;
+        }
+        renderTrendForSession(item, sid);
+      }
+
+      const pinButton = document.createElement('button');
+      pinButton.type = 'button';
+      pinButton.className = `pin-btn ${pinned ? 'on' : ''}`;
+      pinButton.title = pinned ? '取消置顶' : '置顶会话';
+      pinButton.textContent = pinned ? '已置顶' : '置顶';
+      sidRight.appendChild(pinButton);
+
+      sidRow.appendChild(sidLeft);
+      sidRow.appendChild(sidRight);
+      item.appendChild(sidRow);
+
+      const last = document.createElement('div');
+      last.className = `last ${showTyping ? 'typing-preview' : ''}`;
+      if(showTyping){
+        const preview = String(typing.content || '').trim();
+        last.textContent = preview ? `正在输入: ${preview.slice(0, 18)}` : '正在输入...';
+      } else {
+        last.textContent = String(latestText);
+      }
+      item.appendChild(last);
+
+      const issueType = String(f(prechat, 'issueType') || '').trim();
+      const urgency = String(f(prechat, 'urgency') || 'normal').trim();
+      const customerTier = String(f(prechat, 'customerTier') || 'standard').trim();
+      const preMeta = document.createElement('div');
+      preMeta.className = 'last';
+      preMeta.textContent = `意图${intentScore} | ${urgency}${issueType ? ` | ${issueType}` : ''} | ${customerTier}`;
+      item.appendChild(preMeta);
+
+      pinButton.onclick = (e) => {
+        e.stopPropagation();
+        if(!sid) return;
+        if(pinnedMap[sid]) delete pinnedMap[sid];
+        else pinnedMap[sid] = 1;
+        saveInboxState();
+        renderSessionList();
+      };
+      item.onclick = () => openSession(sid);
+      return item;
+    }
+
+    function renderSessionList(){
+      failedList.innerHTML = '';
+      unreadList.innerHTML = '';
+      readList.innerHTML = '';
+
+      let failedCount = 0;
+      let unreadCount = 0;
+      let readCount = 0;
+
+      const sessions = sortSessions(inboxSessions);
+
+      sessions.forEach(s => {
+        const sid = f(s, 'sessionId') || '';
+        const unread = Number(unreadMap[sid] || 0);
+        const failed = failedCountForSession(sid);
+        const item = buildSessionItem(s);
+        if(failed > 0){
+          failedList.appendChild(item);
+          failedCount += 1;
+        } else if(unread > 0){
+          unreadList.appendChild(item);
+          unreadCount += 1;
+        } else {
+          readList.appendChild(item);
+          readCount += 1;
+        }
+      });
+
+      failedTitle.textContent = `失败会话 (${failedCount})`;
+      unreadTitle.textContent = `未读会话 (${unreadCount})`;
+      readTitle.textContent = `已读会话 (${readCount})`;
+      readList.parentElement.style.display = onlyUnreadMode ? 'none' : 'block';
+
+      if(failedCount === 0){
+        const em = document.createElement('div');
+        em.className = 'empty';
+        em.textContent = '暂无失败会话';
+        failedList.appendChild(em);
+      }
+      if(unreadCount === 0){
+        const em = document.createElement('div');
+        em.className = 'empty';
+        em.textContent = '暂无未读会话';
+        unreadList.appendChild(em);
+      }
+      if(readCount === 0){
+        const em = document.createElement('div');
+        em.className = 'empty';
+        em.textContent = '暂无已读会话';
+        readList.appendChild(em);
+      }
+    }
+
+    function renderMessages(parsed, forceBottom){
+      const nearBottom = (msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight) < 40;
+      const prevTop = msgs.scrollTop;
+      const prevHeight = msgs.scrollHeight;
+      msgs.innerHTML = '';
+      msgs.appendChild(loadMoreWrap);
+      parsed.forEach(item => addMsg(item.sender, item.content, false, '', {
+        isInternalNote: String(item.messageType || 'text').toLowerCase() === 'internal_note',
+        mentions: item.mentions || []
+      }));
+
+      ensureSendQueue(activeSession)
+        .filter((item) => item && (item.status === 'sending' || item.status === 'failed' || item.status === 'sent'))
+        .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0))
+        .forEach((item) => {
+          renderQueuedAgentItem(item);
+        });
+
+      if(forceBottom || nearBottom){
+        msgs.scrollTop = msgs.scrollHeight;
+      } else {
+        msgs.scrollTop = Math.max(0, msgs.scrollHeight - prevHeight + prevTop);
+      }
+    }
+
+    async function refreshInbox(){
+      if(inboxRefreshInFlight) return;
+      inboxRefreshInFlight = true;
+      try{
+        const aid = document.getElementById('agentId').value.trim() || 'agent-demo-1';
+        const [r, filteredIdSet] = await Promise.all([
+          fetch(`${apiBase}/api/v1/agent/inbox?agentId=${encodeURIComponent(aid)}`),
+          fetchFilteredSessionIdSet()
+        ]);
+        const j = await r.json();
+        const sessions = f(j, 'sessions');
+        setChip(httpState, 'HTTP: 正常', 'ok');
+        if(!Array.isArray(sessions)) return;
+        const uniqueSessions = dedupeSessionsById(sessions);
+
+        updateSlaChip(f(j, 'sla') || {});
+        updateWorkloadChip(f(j, 'workload') || {});
+        updateAnalyticsChip(f(j, 'analytics') || {});
+
+        inboxSessions = filteredIdSet
+          ? uniqueSessions.filter((s) => filteredIdSet.has(String(f(s, 'sessionId') || '')))
+          : uniqueSessions;
+        const alive = new Set(uniqueSessions.map(s => String(f(s, 'sessionId') || '')).filter(Boolean));
+        Object.keys(pinnedMap).forEach((sid) => {
+          if(!alive.has(sid)) delete pinnedMap[sid];
+        });
+        uniqueSessions.forEach(s => {
+          const sid = f(s, 'sessionId') || '';
+          setTypingSnapshotForSession(sid, f(s, 'typing') || {});
+          const latest = f(s, 'latestMessage') || {};
+          const mid = String(f(latest, 'messageId') || '');
+          const sender = (f(latest, 'senderType') || '').toLowerCase();
+          if(!sid || !mid) return;
+          if(sid === activeSession){
+            seenMap[sid] = mid;
+            countedMidMap[sid] = mid;
+            unreadMap[sid] = 0;
+          } else if(sender === 'visitor' && countedMidMap[sid] !== mid){
+            unreadMap[sid] = Number(unreadMap[sid] || 0) + 1;
+            countedMidMap[sid] = mid;
+          }
+        });
+
+        saveInboxState();
+        renderSessionList();
+      }catch(_e){
+        setChip(httpState, 'HTTP: 异常', 'bad');
+        setChip(slaState, 'SLA: 数据不可用', 'bad');
+        setChip(workloadState, '负载: 数据不可用', 'bad');
+        setChip(analyticsState, '分析: 数据不可用', 'bad');
+      }finally{
+        inboxRefreshInFlight = false;
+      }
+    }
+
+    function acceptActiveSessionIfNeeded(){
+      if(!activeSession || !ws || ws.readyState !== 1) return;
+      const aid = document.getElementById('agentId').value.trim() || 'agent-demo-1';
+      ws.send(JSON.stringify({event:'session.accept', payload:{sessionId:activeSession, agentId:aid}}));
+    }
+
+    function openSession(sid){
+      if(!sid) return;
+      persistCurrentDraft();
+      activeSession = sid;
+      setHistoryLimit(sid, getHistoryLimit(sid));
+      restoreDraftForSession(sid);
+      unreadMap[sid] = 0;
+      seenMap[sid] = countedMidMap[sid] || seenMap[sid] || '';
+      saveInboxState();
+      chatHead.textContent = `当前会话: ${sid}`;
+      acceptActiveSessionIfNeeded();
+      pollMessages(true);
+      checkVisitorPresence();
+      checkTypingStatus();
+      refreshKnowledgeList();
+      renderSessionList();
+    }
+
+    async function pollMessages(forceRender){
+      if(!activeSession) return;
+      try{
+        const limit = getHistoryLimit(activeSession);
+        const r = await fetch(`${apiBase}/api/v1/messages?sessionId=${encodeURIComponent(activeSession)}&viewerType=agent&limit=${encodeURIComponent(limit)}`);
+        const j = await r.json();
+        const arr = f(j, 'messages');
+        setChip(httpState, 'HTTP: 正常', 'ok');
+        if(!Array.isArray(arr)) return;
+        const parsed = arr.map(extractMsg).filter(Boolean);
+        const token = messageToken(parsed);
+        loadMoreWrap.style.display = (parsed.length >= limit && limit < 200) ? '' : 'none';
+        if(forceRender || messageTokenBySession[activeSession] !== token){
+          renderMessages(parsed, !!forceRender);
+          messageTokenBySession[activeSession] = token;
+        }
+        const hasVisitor = parsed.some(m => String(m.sender || '').toLowerCase() === 'visitor');
+        setChip(visitorState, hasVisitor ? '访客状态: 在线' : '访客状态: 已接入', hasVisitor ? 'ok' : 'warn');
+      }catch(_e){
+        setChip(httpState, 'HTTP: 异常', 'bad');
+      }
+    }
+
+    function renderReplay(payload){
+      const arr = f(payload, 'messages');
+      if(!Array.isArray(arr)) return;
+      const parsed = arr.map(extractMsg).filter(Boolean);
+      if(parsed.length === 0) return;
+      const token = messageToken(parsed);
+      renderMessages(parsed, true);
+      messageTokenBySession[activeSession] = token;
+    }
+
+    async function checkVisitorPresence(){
+      if(!activeSession){
+        setChip(visitorState, '访客状态: 未接入', 'warn');
+        return;
+      }
+      try{
+        const r = await fetch(`${apiBase}/api/v1/sessions/presence?sessionId=${encodeURIComponent(activeSession)}`);
+        const j = await r.json();
+        const p = f(j, 'presence') || {};
+        const online = !!f(p, 'visitorOnline');
+        const age = f(p, 'visitorLastActiveAgeSec');
+        const ts = f(p, 'visitorLastActiveUnix');
+        const threshold = f(p, 'idleThresholdSec');
+        const suffix = `最后活跃 ${fmtLocalTime(ts)}`;
+        if(online){
+          setChip(visitorState, `访客状态: 在线(${fmtAge(age)}前, 阈值${fmtAge(threshold)}) | ${suffix}`, 'ok');
+        } else {
+          setChip(visitorState, `访客状态: 离线(${fmtAge(age)}前, 阈值${fmtAge(threshold)}) | ${suffix}`, 'warn');
+        }
+      } catch(_e){
+        setChip(visitorState, '访客状态: 未知', 'bad');
+      }
+    }
+
+    function checkTypingStatus(){
+      if(!activeSession){
+        setChip(typingState, '输入状态: 空闲', 'warn');
+        return;
+      }
+      const t = typingBySession[activeSession] || {};
+      const active = !!t.active;
+      const from = String(t.from || 'visitor').toLowerCase();
+      const content = String(t.content || '').trim();
+      if(active && from === 'visitor'){
+        const preview = content ? `(${content.slice(0, 12)})` : '...';
+        setChip(typingState, `输入状态: 访客正在输入${preview}`, 'ok');
+      } else {
+        setChip(typingState, '输入状态: 空闲', 'warn');
+      }
+    }
+
+    function enqueueAgentMessage(sid, content){
+      const item = {
+        localId: `a-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        sessionId: sid,
+        content,
+        status: 'sending',
+        createdAt: Date.now(),
+        inflight: false
+      };
+      ensureSendQueue(sid).push(item);
+      saveSendQueueState();
+      updateSendStateChip();
+      return item;
+    }
+
+    function updateQueuedStatus(sid, localId, status, messageId, metaExt){
+      const item = ensureSendQueue(sid).find((x) => x && x.localId === localId);
+      if(!item) return;
+      item.status = status;
+      item.inflight = false;
+      if(messageId) item.messageId = messageId;
+      if(status === 'sent') item.sentAt = Date.now();
+      if(metaExt && typeof metaExt === 'object'){
+        if(metaExt.lastError !== undefined) item.lastError = metaExt.lastError;
+        if(metaExt.errorType !== undefined) item.errorType = metaExt.errorType;
+        if(metaExt.nextRetryAt !== undefined) item.nextRetryAt = metaExt.nextRetryAt;
+        if(metaExt.hadFailure !== undefined) item.hadFailure = !!metaExt.hadFailure;
+        if(metaExt.retries !== undefined) item.retries = metaExt.retries;
+        if(metaExt.lastTryAt !== undefined) item.lastTryAt = metaExt.lastTryAt;
+      }
+      saveSendQueueState();
+      updateSendStateChip();
+      if(sid === activeSession) pollMessages(true);
+    }
+
+    function pruneSentQueue(sid){
+      const now = Date.now();
+      sendQueueBySession[sid] = ensureSendQueue(sid).filter((item) => !(item.status === 'sent' && now - Number(item.sentAt || 0) > 1200));
+      saveSendQueueState();
+      updateSendStateChip();
+    }
+
+    function buildOutgoingMessage(raw, forceNote){
+      const text = String(raw || '').trim();
+      if(!text) return null;
+      if(forceNote) return {content: text, messageType: 'internal_note'};
+      if(text.startsWith('/note ')) return {content: text.slice(6).trim(), messageType: 'internal_note'};
+      if(text === '/note') return null;
+      return {content: text, messageType: 'text'};
+    }
+
+    async function sendViaHttp(sid, content, clientMsgId, messageType){
+      try{
+        const r = await fetch(`${apiBase}/api/v1/messages`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: sid,
+            senderType: 'agent',
+            messageType: messageType || 'text',
+            content,
+            clientMsgId
+          })
+        });
+        if(!r.ok) return {ok:false};
+        const j = await r.json();
+        return {ok:true, messageId: f(j, 'messageId') || ''};
+      } catch(_e){
+        return {ok:false};
+      }
+    }
+
+    function sendViaWsWithAck(payload){
+      return new Promise((resolve, reject) => {
+        const clientMsgId = String(payload.clientMsgId || '');
+        if(!clientMsgId){
+          reject(new Error('missing clientMsgId'));
+          return;
+        }
+        if(!ws || ws.readyState !== 1){
+          reject(new Error('ws unavailable'));
+          return;
+        }
+        const timer = setTimeout(() => {
+          delete pendingWsAck[clientMsgId];
+          reject(new Error('ack timeout'));
+        }, 3500);
+        pendingWsAck[clientMsgId] = (ack) => {
+          clearTimeout(timer);
+          resolve(ack || {});
+        };
+        ws.send(JSON.stringify({event:'message.send', payload}));
+      });
+    }
+
+    async function dispatchQueuedItem(item){
+      return dispatchQueuedItemWithMode(item, false);
+    }
+
+    async function dispatchQueuedItemWithMode(item, forceRetry){
+      if(!item || item.inflight) return false;
+      if(!forceRetry && item.nextRetryAt && Date.now() < Number(item.nextRetryAt || 0)) return false;
+      item.retries = Number(item.retries || 0) + 1;
+      item.lastTryAt = Date.now();
+      item.inflight = true;
+      saveSendQueueState();
+      updateSendStateChip();
+
+      const payload = {
+        sessionId: item.sessionId,
+        messageType: item.messageType || 'text',
+        content: item.content,
+        clientMsgId: item.localId
+      };
+
+      try{
+        if(ws && ws.readyState === 1){
+          const ack = await sendViaWsWithAck(payload);
+          updateQueuedStatus(item.sessionId, item.localId, 'sent', f(ack, 'messageId') || '', {lastError:'', errorType:'', nextRetryAt:0});
+          recordRetryEvent('success', item, !!item.hadFailure);
+          setTimeout(() => pruneSentQueue(item.sessionId), 1400);
+          return true;
+        }
+      } catch(_e){
+        item.lastError = 'ws-ack-timeout';
+      }
+
+      const httpResult = await sendViaHttp(item.sessionId, item.content, item.localId, item.messageType || 'text');
+      if(httpResult.ok){
+        updateQueuedStatus(item.sessionId, item.localId, 'sent', httpResult.messageId || '', {lastError:'', errorType:'', nextRetryAt:0});
+        recordRetryEvent('success', item, !!item.hadFailure);
+        setTimeout(() => pruneSentQueue(item.sessionId), 1400);
+        return true;
+      }
+
+      const err = String(item.lastError || 'ws/http-unavailable');
+      const delay = retryDelayMs(item.retries);
+      updateQueuedStatus(item.sessionId, item.localId, 'failed', '', {
+        lastError: err,
+        errorType: classifyErrorType(err),
+        nextRetryAt: Date.now() + delay,
+        hadFailure: true,
+        retries: Number(item.retries || 1),
+        lastTryAt: Number(item.lastTryAt || Date.now())
+      });
+      recordRetryEvent('fail', item, false);
+      return false;
+    }
+
+    async function retryOneQueued(sid, localId){
+      const item = ensureSendQueue(sid).find((x) => x && x.localId === localId);
+      if(!item) return;
+      item.status = 'sending';
+      item.inflight = false;
+      item.nextRetryAt = 0;
+      saveSendQueueState();
+      updateSendStateChip();
+      await dispatchQueuedItemWithMode(item, true);
+    }
+
+    async function retryFailedForSession(sid, filterType, forceRetry){
+      const now = Date.now();
+      const targetType = String(filterType || 'all');
+      const failed = ensureSendQueue(sid).filter((x) => {
+        if(!x || x.status !== 'failed') return false;
+        if(targetType !== 'all' && String(x.errorType || 'other') !== targetType) return false;
+        if(forceRetry) return true;
+        return !x.nextRetryAt || now >= Number(x.nextRetryAt || 0);
+      });
+      for(const item of failed){
+        item.status = 'sending';
+        item.inflight = false;
+        await dispatchQueuedItemWithMode(item, !!forceRetry);
+      }
+      saveSendQueueState();
+      updateSendStateChip();
+    }
+
+    async function retryFailedAllSessions(filterType, forceRetry){
+      for(const sid of Object.keys(sendQueueBySession)){
+        await retryFailedForSession(sid, filterType, forceRetry);
+      }
+    }
+
+    function connect(){
+      if(reconnectTimer){
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        reconnectDelayMs = 1000;
+        setChip(wsState, 'WS: 已连接', 'ok');
+        meta.textContent = `已连接 ${wsUrl}`;
+        startHeartbeat();
+      };
+      ws.onmessage = (ev) => {
+        const data = JSON.parse(ev.data || '{}');
+        const evName = f(data, 'event');
+        const payload = f(data, 'payload') || {};
+        if(evName === 'session.ready'){
+          persistCurrentDraft();
+          activeSession = f(payload, 'sessionId') || '';
+          if(!activeSession){
+            meta.textContent = '接入成功，但未收到 sessionId';
+            return;
+          }
+          restoreDraftForSession(activeSession);
+          chatHead.textContent = `当前会话: ${activeSession}`;
+          meta.textContent = `接待中 sessionId=${activeSession}`;
+          unreadMap[activeSession] = 0;
+          saveInboxState();
+          pollMessages(true);
+          checkVisitorPresence();
+          ws.send(JSON.stringify({event:'session.replay', payload:{sessionId:activeSession}}));
+          renderSessionList();
+        } else if (evName === 'session.replay') {
+          renderReplay(payload);
+        } else if (evName === 'ack') {
+          const cid = String(f(payload, 'clientMsgId') || '');
+          if(cid && pendingWsAck[cid]){
+            const done = pendingWsAck[cid];
+            delete pendingWsAck[cid];
+            done(payload);
+          }
+        } else if (evName === 'error') {
+          meta.textContent = `服务端错误: ${f(payload,'message') || 'unknown'}`;
+        }
+      };
+      ws.onclose = () => {
+        stopHeartbeat();
+        setChip(wsState, 'WS: 已断开', 'bad');
+        scheduleReconnect();
+      };
+      ws.onerror = () => { setChip(wsState, 'WS: 异常', 'bad'); meta.textContent = '连接异常，请检查服务端口'; };
+    }
+
+    document.getElementById('refresh').onclick = refreshInbox;
+    applyMacroBtn.onclick = applySelectedMacro;
+    applyAttrFilterBtn.onclick = () => {
+      attrFilter.issueType = String(filterIssueType.value || '').trim();
+      attrFilter.urgency = String(filterUrgency.value || '').trim();
+      attrFilter.language = String(filterLanguage.value || '').trim();
+      attrFilter.customerTier = String(filterCustomerTier.value || '').trim();
+      refreshInbox();
+    };
+    clearAttrFilterBtn.onclick = () => {
+      attrFilter.issueType = '';
+      attrFilter.urgency = '';
+      attrFilter.language = '';
+      attrFilter.customerTier = '';
+      filterIssueType.value = '';
+      filterUrgency.value = '';
+      filterLanguage.value = '';
+      filterCustomerTier.value = '';
+      refreshInbox();
+    };
+    refreshKnowledgeBtn.onclick = () => refreshKnowledgeList();
+    knowledgeGroup.onchange = () => refreshKnowledgeList();
+    knowledgeQuery.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter') refreshKnowledgeList();
+    });
+
+    function queueAndDispatchOutgoing(forceNote){
+      const sid = (activeSession || '').trim();
+      const outgoing = buildOutgoingMessage(txtEl().value, !!forceNote);
+      if(!sid){
+        meta.textContent = '请先在左侧点选会话';
+        return;
+      }
+      if(!outgoing || !outgoing.content){
+        meta.textContent = '请输入回复内容后再发送';
+        return;
+      }
+      activeSession = sid;
+      const queued = enqueueAgentMessage(sid, outgoing.content);
+      queued.messageType = outgoing.messageType || 'text';
+      txtEl().value = '';
+      clearDraftForSession(sid);
+      sendTyping('');
+      pollMessages(true);
+      dispatchQueuedItem(queued).then((ok) => {
+        if(ok){
+          meta.textContent = queued.messageType === 'internal_note'
+            ? `内部备注发送成功 | sessionId=${sid}`
+            : COPY.sendOkMeta(sid);
+          setTimeout(pollMessages, 180);
+          setTimeout(checkVisitorPresence, 220);
+        } else {
+          meta.textContent = COPY.sendFailMeta;
+          setChip(httpState, 'HTTP: 异常', 'bad');
+        }
+      });
+    }
+
+    document.getElementById('send').onclick = () => queueAndDispatchOutgoing(false);
+    sendNoteBtn.onclick = () => queueAndDispatchOutgoing(true);
+
+    retryFailedBtn.onclick = () => {
+      const t = String(retryFilter.value || 'all');
+      if(activeSession) retryFailedForSession(activeSession, t, true);
+      else retryFailedAllSessions(t, true);
+    };
+
+    exportRetryCsvBtn.onclick = exportRetryMetricsCsv;
+
+    toggleAutoRetryBtn.onclick = () => {
+      autoRetryPaused = !autoRetryPaused;
+      localStorage.setItem('agent_auto_retry_paused', autoRetryPaused ? '1' : '0');
+      applyAutoRetryButtonState();
+      meta.textContent = autoRetryPaused ? COPY.pausedMeta : COPY.resumedMeta;
+    };
+
+    txtEl().addEventListener('keydown', (e)=>{ if(e.key==='Enter') document.getElementById('send').click(); });
+    txtEl().addEventListener('input', (e) => {
+      if(activeSession){
+        draftMap[activeSession] = e.target.value || '';
+        saveDraftState();
+      }
+      const content = String(e.target.value || '').trim();
+      sendTyping(content);
+      if(typingClearTimer) clearTimeout(typingClearTimer);
+      typingClearTimer = setTimeout(() => sendTyping(''), 1500);
+    });
+
+    loadMore.addEventListener('click', bumpHistoryLimit);
+    onlyUnread.addEventListener('change', () => {
+      onlyUnreadMode = !!onlyUnread.checked;
+      localStorage.setItem('agent_only_unread', onlyUnreadMode ? '1' : '0');
+      renderSessionList();
+    });
+    newestFirst.addEventListener('change', () => {
+      newestFirstMode = !!newestFirst.checked;
+      localStorage.setItem('agent_newest_first', newestFirstMode ? '1' : '0');
+      renderSessionList();
+    });
+
+    setInterval(pollMessages, 1200);
+    setInterval(refreshInbox, 1200);
+    setInterval(checkVisitorPresence, 3000);
+    setInterval(checkTypingStatus, 900);
+    setInterval(refreshMacros, 15000);
+    setInterval(refreshKnowledgeList, 20000);
+    setInterval(() => {
+      if(!autoRetryPaused){
+        retryFailedAllSessions(String(retryFilter.value || 'all'), false);
+      }
+    }, 3500);
+    setInterval(() => {
+      if(activeSession) pruneSentQueue(activeSession);
+    }, 2000);
+
+    updateRetryMetricsChip();
+    applyAutoRetryButtonState();
+    refreshMacros();
+    refreshKnowledgeGroups();
+    refreshKnowledgeList();
+    refreshInbox();
+    connect();
+  </script>
+</body>
+</html>

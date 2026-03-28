@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>在线客服 - 访客端</title>
+  <style>
+    body{margin:0;font-family:"Segoe UI","Microsoft YaHei",sans-serif;background:#eef3fb;}
+    .app{max-width:860px;margin:0 auto;height:100vh;display:flex;flex-direction:column;padding:10px;}
+    .head{background:#0f64cb;color:#fff;border-radius:12px 12px 0 0;padding:10px 14px;}
+    .meta{font-size:12px;opacity:.9;margin-top:3px;word-break:break-all;}
+    .state{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;}
+    .chip{font-size:12px;padding:3px 8px;border-radius:999px;background:rgba(255,255,255,.18);}
+    .ok{background:rgba(80,200,120,.28);} .bad{background:rgba(255,90,90,.28);} .warn{background:rgba(255,195,0,.3);}
+    .sid{margin-top:8px;background:rgba(255,255,255,.18);padding:8px;border-radius:10px;font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .sid strong{font-weight:700;}
+    .sid code{background:rgba(255,255,255,.2);padding:2px 6px;border-radius:6px;word-break:break-all;}
+    .sid button{padding:6px 10px;border:0;border-radius:8px;background:#fff;color:#0f64cb;cursor:pointer;font-weight:600;}
+    .prechat{margin-top:8px;background:rgba(255,255,255,.14);padding:8px;border-radius:10px;font-size:12px;display:grid;grid-template-columns:repeat(2,minmax(120px,1fr));gap:8px;}
+    .prechat select{width:100%;padding:6px;border-radius:8px;border:1px solid rgba(255,255,255,.35);background:#fff;color:#1f2d3d;}
+    .prechat .span-2{grid-column:1 / -1;}
+    .msgs{flex:1;background:#fff;padding:10px;overflow:auto;border-left:1px solid #d8e1ef;border-right:1px solid #d8e1ef;}
+    .m{margin:8px 0;display:flex;}
+    .m .b{max-width:75%;padding:8px 10px;border-radius:10px;line-height:1.45;word-break:break-word;}
+    .msgs,.msgs .b{color:#1f2d3d;}
+    .v{justify-content:flex-end;} .v .b{background:#d8e9ff;} .a .b{background:#f1f4f9;}
+    .bar{background:#fff;border:1px solid #d8e1ef;border-top:none;border-radius:0 0 12px 12px;padding:8px;display:flex;gap:8px;}
+    .offline-hint{background:#fff5e9;border:1px solid #ffe2b8;border-top:none;padding:6px 10px;font-size:12px;color:#9a5a00;display:none;}
+    input{flex:1;padding:10px;border:1px solid #cfd9ea;border-radius:8px;} button{padding:10px 14px;background:#0f64cb;color:#fff;border:0;border-radius:8px;cursor:pointer;}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="head">
+      <div>在线客服（访客）</div>
+      <div class="meta" id="meta">连接中...</div>
+      <div class="state">
+        <span class="chip" id="wsState">WS: 连接中</span>
+        <span class="chip" id="httpState">HTTP: 未知</span>
+        <span class="chip" id="agentState">客服状态: 未知</span>
+        <span class="chip" id="outboxState">发送队列: 空闲</span>
+        <span class="chip" id="deliveryMetrics">送达统计: 初始化中</span>
+      </div>
+      <div class="sid">
+        <strong>会话ID:</strong>
+        <code id="sidVal">未分配</code>
+        <button id="copySid">复制</button>
+        <button id="newSid">手动创建会话</button>
+      </div>
+      <div class="prechat">
+        <select id="preIssueType" title="问题类型">
+          <option value="">问题类型(可选)</option>
+          <option value="billing">billing</option>
+          <option value="tech">tech</option>
+          <option value="product">product</option>
+        </select>
+        <select id="preUrgency" title="紧急程度">
+          <option value="normal">紧急程度(normal)</option>
+          <option value="low">low</option>
+          <option value="high">high</option>
+          <option value="urgent">urgent</option>
+        </select>
+        <select id="preLanguage" title="语言">
+          <option value="">语言(自动)</option>
+          <option value="zh-CN">zh-CN</option>
+          <option value="en-US">en-US</option>
+          <option value="ja-JP">ja-JP</option>
+        </select>
+        <select id="preCustomerTier" title="客户层级">
+          <option value="standard">客户层级(standard)</option>
+          <option value="enterprise">enterprise</option>
+          <option value="vip">vip</option>
+        </select>
+      </div>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="bar">
+      <input id="txt" placeholder="请输入咨询内容" />
+      <button id="send">发送</button>
+    </div>
+    <div class="offline-hint" id="offlineHint">离线保护已启用：消息会暂存到本地发送队列并在恢复后自动重试。</div>
+  </div>
+  <script src="./chat-copy.js"></script>
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const wsPort = qs.get('wsPort') || '4001';
+    const apiPort = qs.get('apiPort') || '4000';
+    const host = location.hostname || '127.0.0.1';
+    const wsUrl = `ws://${host}:${wsPort}/ws/visitor`;
+    const apiBase = `http://${host}:${apiPort}`;
+    const COPY = (window.ChatCopy && window.ChatCopy.visitor) || {
+      queueIdle: '发送队列: 空闲',
+      queueFailed: (count) => `发送队列: ${count} 条失败`,
+      queueQueued: (count) => `发送队列: ${count} 条待发送`,
+      pendingFailed: '发送失败，等待自动重试',
+      pendingQueued: '等待发送（离线保护）',
+      pendingSending: '发送中...',
+      sendOkMeta: (sid) => `发送成功 | sessionId=${sid}`,
+      sendFailMeta: '发送失败，已进入离线保护发送队列',
+      onlineMeta: '网络已恢复，正在自动重试发送队列消息',
+      offlineMeta: '当前离线，已切换离线保护并暂存发送队列',
+      offlineHint: '离线保护已启用：消息会暂存到本地发送队列并在恢复后自动重试。'
+    };
+
+    let ws = null;
+    let reconnectDelayMs = 1000;
+    let reconnectTimer = null;
+    let heartbeatTimer = null;
+    let sessionId = localStorage.getItem('demo_session_id') || '';
+    let typingClearTimer = null;
+    let lastTypingPayload = '';
+
+    const draftMap = JSON.parse(localStorage.getItem('visitor_draft_map') || '{}');
+    const outboxBySession = JSON.parse(localStorage.getItem('visitor_outbox') || '{}');
+    const deliveryMetricsStore = JSON.parse(localStorage.getItem('visitor_delivery_metrics') || '{"events":[]}');
+    const pendingWsAck = {};
+
+    const meta = document.getElementById('meta');
+    const msgs = document.getElementById('msgs');
+    const sidVal = document.getElementById('sidVal');
+    const wsState = document.getElementById('wsState');
+    const httpState = document.getElementById('httpState');
+    const agentState = document.getElementById('agentState');
+    const outboxState = document.getElementById('outboxState');
+    const deliveryMetrics = document.getElementById('deliveryMetrics');
+    const txtEl = document.getElementById('txt');
+    const offlineHint = document.getElementById('offlineHint');
+    const preIssueType = document.getElementById('preIssueType');
+    const preUrgency = document.getElementById('preUrgency');
+    const preLanguage = document.getElementById('preLanguage');
+    const preCustomerTier = document.getElementById('preCustomerTier');
+
+    const prechatDraft = JSON.parse(localStorage.getItem('visitor_prechat_draft') || '{"issueType":"","urgency":"normal","language":"","customerTier":"standard"}');
+    preIssueType.value = String(prechatDraft.issueType || '');
+    preUrgency.value = String(prechatDraft.urgency || 'normal');
+    preLanguage.value = String(prechatDraft.language || '');
+    preCustomerTier.value = String(prechatDraft.customerTier || 'standard');
+
+    outboxState.textContent = COPY.queueIdle;
+    offlineHint.textContent = COPY.offlineHint;
+
+    Object.keys(outboxBySession).forEach((sid) => {
+      const items = Array.isArray(outboxBySession[sid]) ? outboxBySession[sid] : [];
+      outboxBySession[sid] = items.map((item) => {
+        if(item && item.status === 'sending') return {...item, status:'failed', inflight:false};
+        return item;
+      }).filter(Boolean);
+    });
+
+    function f(obj, key){
+      if(!obj || typeof obj !== 'object') return undefined;
+      if (obj[key] !== undefined) return obj[key];
+      const nk = String(key).toLowerCase().replace(/[-_]/g, '');
+      for (const k of Object.keys(obj)) {
+        if (String(k).toLowerCase().replace(/[-_]/g, '') === nk) return obj[k];
+      }
+      return undefined;
+    }
+
+    function syncSid(){
+      sidVal.textContent = sessionId || '未分配';
+    }
+
+    function getPrechatPayload(){
+      return {
+        issueType: String(preIssueType.value || '').trim(),
+        urgency: String(preUrgency.value || 'normal').trim() || 'normal',
+        language: String(preLanguage.value || '').trim(),
+        customerTier: String(preCustomerTier.value || 'standard').trim() || 'standard'
+      };
+    }
+
+    function savePrechatDraft(){
+      localStorage.setItem('visitor_prechat_draft', JSON.stringify(getPrechatPayload()));
+    }
+
+    function setChip(el, text, kind){
+      el.textContent = text;
+      el.className = `chip ${kind || ''}`;
+    }
+
+    function addMsg(sender, content, statusText){
+      const row = document.createElement('div');
+      row.className = `m ${sender === 'visitor' ? 'v':'a'}`;
+      const bubble = document.createElement('div');
+      bubble.className='b';
+      const text = (content === undefined || content === null) ? '' : String(content);
+      bubble.textContent = text.trim() === '' ? '[空消息]' : text;
+      if(statusText){
+        bubble.textContent += `\n${statusText}`;
+      }
+      row.appendChild(bubble);
+      msgs.appendChild(row);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function saveDraftState(){
+      localStorage.setItem('visitor_draft_map', JSON.stringify(draftMap));
+    }
+
+    function saveOutboxState(){
+      localStorage.setItem('visitor_outbox', JSON.stringify(outboxBySession));
+    }
+
+    function saveDeliveryMetrics(){
+      localStorage.setItem('visitor_delivery_metrics', JSON.stringify(deliveryMetricsStore));
+    }
+
+    function recordDeliveryEvent(kind, item){
+      if(!Array.isArray(deliveryMetricsStore.events)) deliveryMetricsStore.events = [];
+      deliveryMetricsStore.events.push({
+        ts: Date.now(),
+        kind: String(kind || 'fail'),
+        latencyMs: Math.max(0, Date.now() - Number((item && item.createdAt) || Date.now())),
+        retries: Number((item && item.retries) || 1)
+      });
+      const cutoff = Date.now() - (30 * 60 * 1000);
+      deliveryMetricsStore.events = deliveryMetricsStore.events.filter((x) => Number(x.ts || 0) >= cutoff);
+      saveDeliveryMetrics();
+      updateDeliveryMetricsChip();
+    }
+
+    function updateDeliveryMetricsChip(){
+      const now = Date.now();
+      const events = (Array.isArray(deliveryMetricsStore.events) ? deliveryMetricsStore.events : [])
+        .filter((x) => Number(x.ts || 0) >= now - (5 * 60 * 1000));
+      if(events.length === 0){
+        setChip(deliveryMetrics, '送达统计(5m): 暂无样本', 'warn');
+        return;
+      }
+      const total = events.length;
+      const success = events.filter((x) => x.kind === 'success').length;
+      const fail = events.filter((x) => x.kind === 'fail').length;
+      const avgLatency = Math.round(events.reduce((a, x) => a + Number(x.latencyMs || 0), 0) / Math.max(1, total));
+      const rate = Math.round((success * 1000) / Math.max(1, total)) / 10;
+      const text = `送达统计(5m): 成功率${rate}% | 平均送达${avgLatency}ms | 失败${fail}`;
+      const kind = rate >= 95 ? 'ok' : (rate >= 80 ? 'warn' : 'bad');
+      setChip(deliveryMetrics, text, kind);
+    }
+
+    function draftKeyForSession(sid){
+      return sid || '_pending';
+    }
+
+    function restoreDraftForSession(sid){
+      const key = draftKeyForSession(sid);
+      txtEl.value = String(draftMap[key] || '');
+    }
+
+    function persistDraftForSession(sid, value){
+      const key = draftKeyForSession(sid);
+      draftMap[key] = String(value || '');
+      saveDraftState();
+    }
+
+    function clearDraftForSession(sid){
+      const key = draftKeyForSession(sid);
+      delete draftMap[key];
+      saveDraftState();
+    }
+
+    function ensureOutbox(sid){
+      if(!sid) return [];
+      if(!Array.isArray(outboxBySession[sid])) outboxBySession[sid] = [];
+      return outboxBySession[sid];
+    }
+
+    function updateOutboxStateChip(){
+      let queued = 0;
+      let failed = 0;
+      Object.keys(outboxBySession).forEach((sid) => {
+        ensureOutbox(sid).forEach((item) => {
+          if(item.status === 'queued' || item.status === 'sending') queued += 1;
+          if(item.status === 'failed') failed += 1;
+        });
+      });
+      if(failed > 0){
+        setChip(outboxState, COPY.queueFailed(failed), 'bad');
+      } else if(queued > 0){
+        setChip(outboxState, COPY.queueQueued(queued), 'warn');
+      } else {
+        setChip(outboxState, COPY.queueIdle, 'ok');
+      }
+      const online = navigator.onLine && ws && ws.readyState === 1;
+      offlineHint.style.display = online ? 'none' : '';
+    }
+
+    function enqueueOutboxMessage(content){
+      if(!sessionId) return null;
+      const item = {
+        clientMsgId: `v-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+        sessionId,
+        content,
+        status: 'queued',
+        inflight: false,
+        retries: 0,
+        createdAt: Date.now()
+      };
+      ensureOutbox(sessionId).push(item);
+      saveOutboxState();
+      updateOutboxStateChip();
+      return item;
+    }
+
+    function updateOutboxItemStatus(sid, clientMsgId, status){
+      const item = ensureOutbox(sid).find((x) => x && x.clientMsgId === clientMsgId);
+      if(!item) return;
+      item.status = status;
+      item.inflight = false;
+      if(status === 'sent') item.sentAt = Date.now();
+      saveOutboxState();
+      updateOutboxStateChip();
+    }
+
+    function pruneSentOutbox(sid){
+      const now = Date.now();
+      outboxBySession[sid] = ensureOutbox(sid).filter((item) => !(item.status === 'sent' && now - Number(item.sentAt || 0) > 1200));
+      saveOutboxState();
+      updateOutboxStateChip();
+    }
+
+    function msgField(msg, key){
+      const direct = f(msg, key);
+      if(direct !== undefined) return direct;
+      if(Array.isArray(msg)){
+        for(let i=0;i<msg.length-1;i+=2){
+          const k = String(msg[i] || '').replace(/^:/,'').toLowerCase().replace(/[-_]/g,'');
+          const target = String(key).toLowerCase().replace(/[-_]/g,'');
+          if(k === target) return msg[i+1];
+        }
+      }
+      return undefined;
+    }
+
+    function extractMsg(msg){
+      if(msg === undefined || msg === null) return null;
+      if(typeof msg === 'string'){
+        const t = msg.trim();
+        return t ? { sender:'agent', content:t } : null;
+      }
+
+      const sender =
+        msgField(msg, 'senderType') ??
+        msgField(msg, 'sender') ??
+        msgField(msg, 'role') ??
+        'agent';
+
+      let content =
+        msgField(msg, 'content') ??
+        msgField(msg, 'message') ??
+        msgField(msg, 'text') ??
+        msgField(msg, 'body');
+
+      if(content && typeof content === 'object'){
+        content =
+          msgField(content, 'content') ??
+          msgField(content, 'text') ??
+          msgField(content, 'message') ??
+          JSON.stringify(content);
+      }
+
+      if(content === undefined || content === null) return null;
+      const text = String(content).trim();
+      if(!text) return null;
+      return { sender: String(sender || 'agent').toLowerCase(), content: text };
+    }
+
+    async function pollMessages(){
+      if(!sessionId) return;
+      try{
+        const r = await fetch(`${apiBase}/api/v1/messages?sessionId=${encodeURIComponent(sessionId)}&viewerType=visitor`);
+        const j = await r.json();
+        const arr = f(j, 'messages');
+        setChip(httpState, 'HTTP: 正常', 'ok');
+        if(!Array.isArray(arr)) return;
+        const parsed = arr.map(extractMsg).filter(Boolean);
+        if(parsed.length > 0){
+          msgs.innerHTML = '';
+          parsed.forEach(item => addMsg(item.sender, item.content));
+        }
+
+        const pending = ensureOutbox(sessionId)
+          .filter((item) => item && (item.status === 'queued' || item.status === 'sending' || item.status === 'failed'))
+          .sort((a, b) => Number(a.createdAt || 0) - Number(b.createdAt || 0));
+        pending.forEach((item) => {
+          const marker = item.status === 'failed'
+            ? COPY.pendingFailed
+            : (item.status === 'queued' ? COPY.pendingQueued : COPY.pendingSending);
+          addMsg('visitor', item.content, marker);
+        });
+      }catch(_e){
+        setChip(httpState, 'HTTP: 异常', 'bad');
+      }
+    }
+
+    function fmtAge(sec){
+      if(sec === undefined || sec === null) return '未知';
+      return `${Math.max(0, Number(sec)||0)}s`;
+    }
+
+    function fmtLocalTime(unixSec){
+      if(unixSec === undefined || unixSec === null) return '未知';
+      const d = new Date(Number(unixSec) * 1000);
+      if(Number.isNaN(d.getTime())) return '未知';
+      return d.toLocaleTimeString('zh-CN', {hour12:false});
+    }
+
+    async function checkAgentPresence(){
+      if(!sessionId){
+        setChip(agentState, '客服状态: 未接入', 'warn');
+        return;
+      }
+      try{
+        const r = await fetch(`${apiBase}/api/v1/sessions/presence?sessionId=${encodeURIComponent(sessionId)}`);
+        const j = await r.json();
+        const p = f(j, 'presence') || {};
+        const online = !!f(p, 'agentOnline');
+        const age = f(p, 'agentLastActiveAgeSec');
+        const ts = f(p, 'agentLastActiveUnix');
+        const threshold = f(p, 'idleThresholdSec');
+        const suffix = `最后活跃 ${fmtLocalTime(ts)}`;
+        if(online){
+          setChip(agentState, `客服状态: 在线(${fmtAge(age)}前, 阈值${fmtAge(threshold)}) | ${suffix}`, 'ok');
+        } else {
+          setChip(agentState, `客服状态: 离线(${fmtAge(age)}前, 阈值${fmtAge(threshold)}) | ${suffix}`, 'warn');
+        }
+      } catch(_e){
+        setChip(agentState, '客服状态: 未知', 'bad');
+      }
+    }
+
+    async function sendViaHttp(item){
+      if(!item || !item.sessionId) return {ok:false};
+      try{
+        const r = await fetch(`${apiBase}/api/v1/messages`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            sessionId: item.sessionId,
+            senderType: 'visitor',
+            messageType: 'text',
+            content: item.content,
+            clientMsgId: item.clientMsgId
+          })
+        });
+        if(!r.ok) return {ok:false};
+        return {ok:true};
+      }catch(_e){
+        return {ok:false};
+      }
+    }
+
+    function sendViaWsWithAck(item){
+      return new Promise((resolve, reject) => {
+        if(!ws || ws.readyState !== 1){
+          reject(new Error('ws unavailable'));
+          return;
+        }
+        const timer = setTimeout(() => {
+          delete pendingWsAck[item.clientMsgId];
+          reject(new Error('ack timeout'));
+        }, 3500);
+        pendingWsAck[item.clientMsgId] = () => {
+          clearTimeout(timer);
+          resolve({ok:true});
+        };
+        ws.send(JSON.stringify({
+          event:'message.send',
+          payload:{
+            sessionId: item.sessionId,
+            messageType:'text',
+            content: item.content,
+            clientMsgId: item.clientMsgId
+          }
+        }));
+      });
+    }
+
+    async function dispatchOutboxItem(item){
+      if(!item || item.inflight) return false;
+      item.retries = Number(item.retries || 0) + 1;
+      item.inflight = true;
+      item.status = 'sending';
+      saveOutboxState();
+      updateOutboxStateChip();
+
+      try{
+        if(ws && ws.readyState === 1){
+          await sendViaWsWithAck(item);
+          updateOutboxItemStatus(item.sessionId, item.clientMsgId, 'sent');
+          recordDeliveryEvent('success', item);
+          setTimeout(() => pruneSentOutbox(item.sessionId), 1400);
+          return true;
+        }
+      } catch(_e){
+      }
+
+      const httpRes = await sendViaHttp(item);
+      if(httpRes.ok){
+        updateOutboxItemStatus(item.sessionId, item.clientMsgId, 'sent');
+        recordDeliveryEvent('success', item);
+        setTimeout(() => pruneSentOutbox(item.sessionId), 1400);
+        return true;
+      }
+
+      updateOutboxItemStatus(item.sessionId, item.clientMsgId, 'failed');
+      recordDeliveryEvent('fail', item);
+      return false;
+    }
+
+    async function flushOutbox(){
+      const sid = sessionId;
+      if(!sid) return;
+      const pending = ensureOutbox(sid).filter((item) => item && (item.status === 'queued' || item.status === 'failed'));
+      for(const item of pending){
+        await dispatchOutboxItem(item);
+      }
+      pollMessages();
+    }
+
+    function sendTyping(content){
+      if(!sessionId || !ws || ws.readyState !== 1) return;
+      const text = String(content || '').slice(0, 64);
+      if(text === lastTypingPayload) return;
+      lastTypingPayload = text;
+      ws.send(JSON.stringify({event:'typing', payload:{sessionId, content:text}}));
+    }
+
+    function startHeartbeat(){
+      if(heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        if(ws && ws.readyState === 1){
+          ws.send(JSON.stringify({event:'ping', payload:{at:Date.now()}}));
+        }
+      }, 20000);
+    }
+
+    function stopHeartbeat(){
+      if(heartbeatTimer){
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
+    }
+
+    function scheduleReconnect(){
+      if(reconnectTimer) clearTimeout(reconnectTimer);
+      const delay = Math.min(10000, reconnectDelayMs) + Math.floor(Math.random() * 400);
+      reconnectTimer = setTimeout(connect, delay);
+      reconnectDelayMs = Math.min(10000, reconnectDelayMs * 2);
+      meta.textContent = `连接已断开，${Math.ceil(delay / 1000)}秒后重连...`;
+      updateOutboxStateChip();
+    }
+
+    async function createSessionByHttp(){
+      try{
+        const body = sessionId ? {sessionId} : {};
+        body.prechat = getPrechatPayload();
+        savePrechatDraft();
+        const r = await fetch(`${apiBase}/api/v1/sessions`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(body)
+        });
+        const j = await r.json();
+        const sid = String(f(j, 'sessionId') || '');
+        if(sid){
+          sessionId = sid;
+          localStorage.setItem('demo_session_id', sessionId);
+          syncSid();
+          restoreDraftForSession(sessionId);
+          meta.textContent = `sessionId=${sessionId} | HTTP=${r.status} | WS=${wsUrl}`;
+          addMsg('agent', '会话已创建，可以开始咨询。');
+          flushOutbox();
+        } else {
+          meta.textContent = `会话创建返回 ${r.status}，但未找到 sessionId 字段`;
+        }
+      }catch(_e){
+        meta.textContent = '创建会话失败，请检查服务是否启动';
+      }
+    }
+
+    function connect(){
+      if(reconnectTimer){
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        reconnectDelayMs = 1000;
+        setChip(wsState, 'WS: 已连接', 'ok');
+        startHeartbeat();
+        updateOutboxStateChip();
+        const payload = sessionId ? {sessionId} : {};
+        payload.prechat = getPrechatPayload();
+        ws.send(JSON.stringify({event:'session.init', payload}));
+      };
+      ws.onmessage = (ev) => {
+        const data = JSON.parse(ev.data || '{}');
+        const evName = f(data, 'event');
+        const payload = f(data, 'payload') || {};
+        if(evName === 'session.ready'){
+          sessionId = f(payload, 'sessionId') || '';
+          if(!sessionId){
+            meta.textContent = '会话初始化成功，但未拿到 sessionId';
+            return;
+          }
+          localStorage.setItem('demo_session_id', sessionId);
+          syncSid();
+          restoreDraftForSession(sessionId);
+          meta.textContent = `sessionId=${sessionId} | WS=${wsUrl}`;
+          addMsg('agent', f(payload, 'welcomeMessage') || '您好，这里是在线客服。');
+          pollMessages();
+          checkAgentPresence();
+          flushOutbox();
+        } else if (evName === 'ack') {
+          const cid = String(f(payload, 'clientMsgId') || '');
+          if(cid && pendingWsAck[cid]){
+            const done = pendingWsAck[cid];
+            delete pendingWsAck[cid];
+            done(payload);
+          }
+        } else if (evName === 'error') {
+          meta.textContent = `服务端错误: ${f(payload,'message') || 'unknown'}`;
+        }
+      };
+      ws.onclose = () => {
+        stopHeartbeat();
+        setChip(wsState, 'WS: 已断开', 'bad');
+        scheduleReconnect();
+      };
+      ws.onerror = () => { setChip(wsState, 'WS: 异常', 'bad'); meta.textContent = '连接异常，请检查服务端口'; updateOutboxStateChip(); };
+    }
+
+    document.getElementById('copySid').onclick = async () => {
+      if(!sessionId){
+        meta.textContent = '当前还没有 sessionId';
+        return;
+      }
+      try{
+        await navigator.clipboard.writeText(sessionId);
+        meta.textContent = `已复制 sessionId: ${sessionId}`;
+      }catch(_e){
+        meta.textContent = `复制失败，请手动复制: ${sessionId}`;
+      }
+    };
+
+    document.getElementById('newSid').onclick = () => {
+      createSessionByHttp();
+    };
+
+    [preIssueType, preUrgency, preLanguage, preCustomerTier].forEach((el) => {
+      el.onchange = () => savePrechatDraft();
+    });
+
+    document.getElementById('send').onclick = () => {
+      const content = txtEl.value.trim();
+      if(!content){
+        meta.textContent = '请输入内容后再发送';
+        return;
+      }
+      if(!sessionId){
+        meta.textContent = '当前无会话ID，请先点“手动创建会话”';
+        persistDraftForSession('', content);
+        return;
+      }
+      const item = enqueueOutboxMessage(content);
+      txtEl.value = '';
+      clearDraftForSession(sessionId);
+      sendTyping('');
+      pollMessages();
+      dispatchOutboxItem(item).then((ok) => {
+        if(ok){
+          meta.textContent = COPY.sendOkMeta(sessionId);
+          setTimeout(pollMessages, 180);
+        } else {
+          meta.textContent = COPY.sendFailMeta;
+          setChip(httpState, 'HTTP: 异常', 'bad');
+        }
+      });
+    };
+
+    txtEl.addEventListener('input', (e) => {
+      const text = String(e.target.value || '');
+      persistDraftForSession(sessionId, text);
+      sendTyping(text.trim());
+      if(typingClearTimer) clearTimeout(typingClearTimer);
+      typingClearTimer = setTimeout(() => sendTyping(''), 1500);
+    });
+
+    txtEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') document.getElementById('send').click(); });
+    window.addEventListener('online', () => {
+      meta.textContent = COPY.onlineMeta;
+      updateOutboxStateChip();
+      flushOutbox();
+    });
+    window.addEventListener('offline', () => {
+      meta.textContent = COPY.offlineMeta;
+      updateOutboxStateChip();
+    });
+    syncSid();
+    restoreDraftForSession(sessionId);
+    updateOutboxStateChip();
+    updateDeliveryMetricsChip();
+    setInterval(pollMessages, 1200);
+    setInterval(checkAgentPresence, 3000);
+    setInterval(flushOutbox, 3500);
+    checkAgentPresence();
+    connect();
+  </script>
+</body>
+</html>
