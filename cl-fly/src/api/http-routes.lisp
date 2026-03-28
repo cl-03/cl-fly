@@ -7,6 +7,8 @@
   (:import-from #:cl-fly.core.bootstrap-admin
                 #:agent-login
                 #:change-admin-password)
+  (:import-from #:cl-fly.auth.jwt
+                #:verify-token)
   (:import-from #:cl-fly.core.session
                 #:ensure-session
                 #:set-session-prechat
@@ -52,6 +54,7 @@
                 #:log-message-sent
                 #:log-security-event)
   (:import-from #:cl-fly.core.audit
+                #:write-audit-event
                 #:write-config-change-audit
                 #:write-blacklist-audit)
   (:export
@@ -97,9 +100,11 @@
 
 (defun %safe-int (value &optional (default 0))
   (handler-case
-      (etypecase value
-        (integer value)
-        (string (parse-integer value :junk-allowed t)))
+      (let ((parsed
+              (etypecase value
+                (integer value)
+                (string (parse-integer value :junk-allowed t)))))
+        (if (integerp parsed) parsed default))
     (error () default)))
 
 (defun %read-file-text (pathname)
@@ -144,6 +149,41 @@
 (defun %non-empty-string-p (value)
   (and (stringp value)
        (> (length (string-trim '(#\Space #\Tab #\Newline #\Return) value)) 0)))
+
+(defun %bearer-token-from-header (&optional auth-header)
+  (let* ((header (or auth-header (hunchentoot:header-in* "authorization")))
+         (prefix "Bearer "))
+    (when (and (stringp header)
+               (>= (length header) (length prefix))
+               (string-equal prefix (subseq header 0 (length prefix))))
+      (let ((token (string-trim '(#\Space #\Tab #\Newline #\Return)
+                                (subseq header (length prefix)))))
+        (unless (string= token "")
+          token)))))
+
+(defun %agent-request-authorized-p (&optional auth-header)
+  (not (null (%agent-auth-sub auth-header))))
+
+(defun %agent-auth-sub (&optional auth-header)
+  (let ((token (%bearer-token-from-header auth-header)))
+    (when token
+      (let ((claims (verify-token token)))
+        (and claims
+             (member (string-downcase (or (getf claims :role) ""))
+                     '("agent" "admin")
+                     :test #'string=)
+             (%trimmed-string-or (getf claims :sub) nil))))))
+
+(defun %trimmed-string-or (value fallback)
+  (if (stringp value)
+      (let ((trimmed (string-trim '(#\Space #\Tab #\Newline #\Return) value)))
+        (if (string= trimmed "") fallback trimmed))
+      fallback))
+
+(defun %effective-uploader-id (sender-type uploader-id &optional agent-sub)
+  (if (string= (string-downcase (or sender-type "")) "visitor")
+      "visitor"
+      (%trimmed-string-or agent-sub (%trimmed-string-or uploader-id "agent"))))
 
 (defun %string-length<= (value max-len)
   (or (null value)
@@ -615,6 +655,7 @@
              (sender-type (or (%json-get data :senderType)
                               (%json-get data :sender-type)
                               "visitor"))
+              (agent-sub (%agent-auth-sub))
              (msg-type (or (%json-get data :messageType)
                            (%json-get data :message-type)
                            "text"))
@@ -637,6 +678,10 @@
           ((and (string= (string-downcase msg-type) "internal_note")
              (not (string= (string-downcase sender-type) "agent")))
            (%json-response (list :ok nil :error (list :code "INVALID_ARGUMENT" :message "internal_note requires senderType=agent")) 400))
+          ((and (string= (string-downcase sender-type) "agent")
+             (null agent-sub))
+           (log-security-event "message_agent_sender_unauthorized" (list :session-id session-id))
+           (%json-response (list :ok nil :error (list :code "AUTH_FORBIDDEN" :message "agent sender requires bearer token")) 401))
           ((or (not (%non-empty-string-p content))
                (> (length content) *max-message-content-length*))
            (log-security-event "message_invalid_content" (list :session-id session-id :length (length content)))
@@ -648,6 +693,16 @@
            (let ((saved (send-message session-id sender-type msg-type content :client-msg-id client-msg-id)))
              (touch-session-activity session-id sender-type)
              (log-message-sent session-id (getf saved :message-id) sender-type)
+             (write-audit-event (if (string= (string-downcase sender-type) "agent")
+                                    agent-sub
+                                    "visitor")
+                                "message.send.http"
+                                "message"
+                                (getf saved :message-id)
+                                (jonathan:to-json (list :sessionId session-id
+                                                        :senderType sender-type
+                                                        :clientMsgId client-msg-id
+                                                        :messageType msg-type)))
              (%json-response (list :ok t
                        :messageId (getf saved :message-id)
                        :clientMsgId client-msg-id)
@@ -696,9 +751,11 @@
              (sender-type (or (%json-get data :senderType)
                               (%json-get data :sender-type)
                               "visitor"))
-             (uploader-id (or (%json-get data :uploaderId)
-                              (%json-get data :uploader-id)
-                              "visitor"))
+             (agent-sub (%agent-auth-sub))
+             (requested-uploader-id (or (%json-get data :uploaderId)
+                          (%json-get data :uploader-id)
+                          "visitor"))
+             (uploader-id (%effective-uploader-id sender-type requested-uploader-id agent-sub))
              (client-msg-id (or (%json-get data :clientMsgId)
                                 (%json-get data :client-msg-id)
                                 "")))
@@ -725,6 +782,30 @@
            (%json-response
             (list :ok nil :error (list :code "INVALID_ARGUMENT" :message "invalid sender or identifier"))
             400))
+          ((and (string= (string-downcase sender-type) "agent")
+             (null agent-sub))
+           (log-security-event "upload_agent_sender_unauthorized" (list :session-id session-id))
+           (%json-response
+            (list :ok nil :error (list :code "AUTH_FORBIDDEN" :message "agent sender requires bearer token"))
+            401))
+          ((and (string= (string-downcase sender-type) "visitor")
+             (%non-empty-string-p requested-uploader-id)
+             (not (string= (%trimmed-string-or requested-uploader-id "") "visitor")))
+           (log-security-event "upload_visitor_uploaderid_overridden"
+                   (list :session-id session-id
+                      :requested-uploader-id requested-uploader-id
+                      :effective-uploader-id uploader-id))
+           (let ((result (process-upload-and-send session-id
+                          sender-type
+                          uploader-id
+                          filename
+                          mime-type
+                          file-size
+                          file-content
+                          :client-msg-id client-msg-id)))
+             (if (getf result :ok)
+              (%json-response result 201)
+              (%json-response result 400))))
           (t
            (let ((result (process-upload-and-send session-id
                                                   sender-type
