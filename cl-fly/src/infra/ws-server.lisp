@@ -227,7 +227,16 @@
   (loop while *ws-running*
         do (handler-case
                (let ((client (usocket:socket-accept *ws-listener* :element-type '(unsigned-byte 8))))
-                 (bt:make-thread (lambda () (%handle-client client))
+                 (bt:make-thread
+                  (lambda ()
+                    ;; Defensive guard: keep client-thread failures from bubbling as unhandled
+                    ;; conditions that can poison test runner exit status.
+                    (handler-case
+                        (%handle-client client)
+                      (serious-condition (e)
+                        (log-error "websocket client thread crashed"
+                                   (list :error (princ-to-string e)))
+                        (ignore-errors (usocket:socket-close client)))))
                                  :name "cl-fly-ws-client"))
              (error (e)
                (when *ws-running*
